@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --map-bg: #0b1220;
+  --map-line: #1c2740;
+  --glass: rgba(17, 24, 39, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  /* 3 niveles de texto, verificados con la fórmula de contraste WCAG contra
+     todas las superficies oscuras reales del proyecto (map-bg, glass,
+     surface-1, map-line, tarjetas con overlay blanco/3%):
+       --text     (primario)   >= 7:1   (12.5–15.8 medido)
+       --muted    (secundario) >= 4.5:1 (4.83 medido, el peor caso)
+       --muted-2  (terciario)  >= 3:1   (3.04 medido, el peor caso)
+     --muted-2 es SOLO para texto decorativo (hints, placeholders, fine
+     print) — cualquier dato que el usuario necesite leer activamente
+     (IDs, fechas, departamentos, headers de tabla) usa --muted o --text. */
+  --text: #e7ecf7;
+  --muted: #8993ac;
+  --muted-2: #68708d;
+  --cyan: #3ed6c4;
+  --blue: #4c7fff;
+  --amber: #f5a623;
+  --green: #34d399;
+  --red: #ff4d6d;
+  --slate: #64748b;
+
+  /* Alias semánticos por rol (usados en el aro de prioridad del marcador). */
+  --fill-danger: var(--red);
+  --fill-warning: var(--amber);
+  --fill-accent: var(--blue);
+  --fill-success: var(--green);
+  --border: var(--slate);
+  --surface-1: #131d33;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--map-bg);
+  color: var(--text);
+  font-family: "Public Sans", sans-serif;
+}
+
+/* Panel "glass": base visual reutilizada por tarjetas KPI, rail de sitios,
+   drawer de detalle y las cards de la vista de métricas. */
+.glass-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+}
+
+.mono-label {
+  font-family: "JetBrains Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.marker-pulse {
+  animation: pulse-marker 1.5s infinite;
+}
+
+@keyframes pulse-marker {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.leaflet-container {
+  background: var(--map-bg);
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #131d33;
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+}
+
+.leaflet-control-attribution {
+  background: rgba(11, 18, 32, 0.6) !important;
+  color: var(--muted-2) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--muted) !important;
+}
+
+/* Scrollbar discreto para paneles flotantes con overflow */
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 999px;
+}
