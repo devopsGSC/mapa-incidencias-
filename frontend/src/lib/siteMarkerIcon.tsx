@@ -82,7 +82,16 @@ export function buildSiteMarkerIcon(
   );
 
   const selectedRing = selected ? "0 0 0 3px rgba(62,214,196,0.55)," : "";
-  const pulseClass = priorityPresence.critical ? "marker-pulse" : "";
+  const hasOpenTickets =
+    priorityPresence.critical || priorityPresence.high || priorityPresence.normal || priorityPresence.low;
+  // Rojo pulsante para sitios con crítico abierto (ver .marker-pulse); azul
+  // más sutil para sitios con cualquier otro ticket abierto, así se
+  // distingue de un sitio realmente sin nada pendiente (sin glow).
+  const pulseClass = priorityPresence.critical
+    ? "marker-pulse"
+    : hasOpenTickets
+      ? "marker-pulse-open"
+      : "";
 
   // Máximo 3 slots secundarios en total: si hay más de 3 departamentos
   // adicionales, los primeros 2 se muestran como íconos y el 3er slot se

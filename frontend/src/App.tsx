@@ -8,8 +8,17 @@ import { computeSiteDepartmentBreakdown, computeSitePriorityPresence } from "./l
 import { Site } from "./types";
 
 export default function App() {
-  const { sites, tickets, stats, loading, error, notifications, dismissNotification } =
-    useDashboardData();
+  const {
+    sites,
+    tickets,
+    stats,
+    loading,
+    error,
+    connected,
+    lastHeartbeatAt,
+    notifications,
+    dismissNotification,
+  } = useDashboardData();
   const [view, setView] = useState<DashboardView>("map");
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
 
@@ -31,7 +40,12 @@ export default function App() {
 
   return (
     <div className="h-screen overflow-hidden bg-[color:var(--map-bg)]">
-      <TopBar view={view} onViewChange={setView} />
+      <TopBar
+        view={view}
+        onViewChange={setView}
+        connected={connected}
+        lastHeartbeatAt={lastHeartbeatAt}
+      />
       <NotificationStack
         notifications={notifications}
         sites={sites}

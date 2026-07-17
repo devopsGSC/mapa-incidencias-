@@ -1,14 +1,18 @@
 import { ReactNode } from "react";
 import logo from "../img/logo_gcs_blanco.png";
+import { SoundToggle } from "./SoundToggle";
+import { SyncStatus } from "./SyncStatus";
 
 export type DashboardView = "map" | "metrics";
 
 interface TopBarProps {
   view: DashboardView;
   onViewChange: (view: DashboardView) => void;
+  connected: boolean;
+  lastHeartbeatAt: Date | null;
 }
 
-export function TopBar({ view, onViewChange }: TopBarProps) {
+export function TopBar({ view, onViewChange, connected, lastHeartbeatAt }: TopBarProps) {
   return (
     <header className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-[#080c16] to-transparent px-5 py-4">
       <div className="flex items-center gap-3">
@@ -23,14 +27,18 @@ export function TopBar({ view, onViewChange }: TopBarProps) {
         </div>
       </div>
 
-      <nav className="glass-panel flex items-center gap-1 rounded-full p-1">
-        <ViewButton active={view === "map"} onClick={() => onViewChange("map")}>
-          Mapa
-        </ViewButton>
-        <ViewButton active={view === "metrics"} onClick={() => onViewChange("metrics")}>
-          Métricas
-        </ViewButton>
-      </nav>
+      <div className="flex items-center gap-3">
+        <nav className="glass-panel flex items-center gap-1 rounded-full p-1">
+          <ViewButton active={view === "map"} onClick={() => onViewChange("map")}>
+            Mapa
+          </ViewButton>
+          <ViewButton active={view === "metrics"} onClick={() => onViewChange("metrics")}>
+            Métricas
+          </ViewButton>
+        </nav>
+        <SoundToggle />
+        <SyncStatus connected={connected} lastHeartbeatAt={lastHeartbeatAt} />
+      </div>
     </header>
   );
 }

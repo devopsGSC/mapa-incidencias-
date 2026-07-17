@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchSites, fetchTickets } from "../api/client";
 import { computeStats } from "../lib/computeStats";
+import { playTicketChime } from "../lib/notificationSound";
 import { Site, Ticket } from "../types";
 import { useSocket } from "./useSocket";
 
@@ -11,6 +12,7 @@ interface DashboardState {
   error: string | null;
   connected: boolean;
   lastEventAt: Date | null;
+  lastHeartbeatAt: Date | null;
 }
 
 export interface TicketNotification {
@@ -28,6 +30,7 @@ export function useDashboardData() {
     error: null,
     connected: false,
     lastEventAt: null,
+    lastHeartbeatAt: null,
   });
   const [notifications, setNotifications] = useState<TicketNotification[]>([]);
 
@@ -44,6 +47,7 @@ export function useDashboardData() {
   const handleTicketNew = useCallback(
     (incoming: Ticket) => {
       upsertTicket(incoming);
+      playTicketChime(incoming.priority);
       setNotifications((prev) => {
         const entry: TicketNotification = { id: `${incoming.id}-${Date.now()}`, ticket: incoming };
         return [...prev, entry].slice(-MAX_VISIBLE_NOTIFICATIONS);
@@ -56,9 +60,14 @@ export function useDashboardData() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
+  const handleHeartbeat = useCallback(() => {
+    setState((prev) => ({ ...prev, lastHeartbeatAt: new Date() }));
+  }, []);
+
   const { connected } = useSocket({
     onTicketNew: handleTicketNew,
     onTicketUpdated: upsertTicket,
+    onHeartbeat: handleHeartbeat,
   });
 
   useEffect(() => {

@@ -2,7 +2,6 @@ import { SiteStat, SiteType, TicketPriority, TicketStatus } from "../types";
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   open: "Abierto",
-  in_progress: "En progreso",
   resolved: "Resuelto",
   closed: "Cerrado",
 };
@@ -54,7 +53,6 @@ export const SEVERITY_COLORS: Record<SiteSeverity, string> = {
 
 export const STATUS_CHART_COLORS: Record<TicketStatus, string> = {
   open: "#4C7FFF",
-  in_progress: "#F5A623",
   resolved: "#34D399",
   closed: "#64748B",
 };

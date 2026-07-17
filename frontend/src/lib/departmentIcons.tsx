@@ -3,6 +3,7 @@ import {
   IconBoxMultiple,
   IconBuilding,
   IconChartBar,
+  IconCpu,
   IconHeadset,
   IconNut,
   IconTool,
@@ -23,6 +24,7 @@ export const DEPARTMENT_ICON_MAP: Record<string, Icon> = {
   Redes: IconWifi,
   Soporte: IconHeadset,
   Ventas: IconChartBar,
+  Tecnología: IconCpu,
 };
 
 const FALLBACK_ICON: Icon = IconBuilding;

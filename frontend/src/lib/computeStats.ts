@@ -1,11 +1,11 @@
 import { Site, Ticket, TicketPriority, TicketStats, TicketStatus } from "../types";
 
-const STATUSES: TicketStatus[] = ["open", "in_progress", "resolved", "closed"];
+const STATUSES: TicketStatus[] = ["open", "resolved", "closed"];
 const PRIORITIES: TicketPriority[] = ["low", "normal", "high", "critical"];
 const TREND_DAYS = 30;
 
 function isOpenStatus(status: TicketStatus): boolean {
-  return status === "open" || status === "in_progress";
+  return status === "open";
 }
 
 function isToday(isoDate: string): boolean {

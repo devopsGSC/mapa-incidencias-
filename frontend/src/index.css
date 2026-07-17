@@ -67,15 +67,70 @@ body {
   animation: pulse-marker 1.5s infinite;
 }
 
+/* filter (no box-shadow): el aro ya usa box-shadow inline para el anillo de
+   selección (selectedRing) — animar box-shadow acá lo pisaría mientras dura
+   el pulso. drop-shadow no choca con esa propiedad. */
 @keyframes pulse-marker {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
+  0%,
   100% {
     opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(255, 77, 109, 0.7)) drop-shadow(0 0 10px rgba(255, 77, 109, 0.5));
+  }
+  50% {
+    opacity: 0.65;
+    filter: drop-shadow(0 0 9px rgba(255, 77, 109, 0.95)) drop-shadow(0 0 22px rgba(255, 77, 109, 0.85));
+  }
+}
+
+/* Misma idea que .marker-pulse pero azul y un poco más sutil: sitios con
+   tickets abiertos que no son críticos (esos ya tienen su propio rojo). */
+.marker-pulse-open {
+  animation: pulse-marker-open 1.5s infinite;
+}
+
+@keyframes pulse-marker-open {
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(76, 127, 255, 0.65)) drop-shadow(0 0 9px rgba(76, 127, 255, 0.45));
+  }
+  50% {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 8px rgba(76, 127, 255, 0.9)) drop-shadow(0 0 18px rgba(76, 127, 255, 0.75));
+  }
+}
+
+/* Un solo "blip" (no infinito): se reproduce una vez cada vez que este
+   elemento se remonta (la key cambia con cada heartbeat del backend). */
+.heartbeat-blip {
+  animation: heartbeat-blip 1s ease-out;
+}
+
+@keyframes heartbeat-blip {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* Alarma persistente: mientras haya al menos un ticket crítico abierto.
+   A diferencia de marker-pulse (solo opacidad), esta pulsa el "glow" rojo
+   para que se note incluso de reojo en una TV/monitor. */
+.critical-alarm {
+  animation: pulse-critical 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-critical {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 109, 0.65), 0 0 16px 2px rgba(255, 77, 109, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 16px rgba(255, 77, 109, 0), 0 0 32px 12px rgba(255, 77, 109, 0.95);
   }
 }
 

@@ -8,7 +8,7 @@ export interface DepartmentCount {
 export type PriorityPresence = Record<TicketPriority, boolean>;
 
 function isOpenStatus(status: Ticket["status"]): boolean {
-  return status === "open" || status === "in_progress";
+  return status === "open";
 }
 
 function groupTicketsBySite(tickets: Ticket[]): Map<string, Ticket[]> {
@@ -34,7 +34,7 @@ function departmentCounts(tickets: Ticket[]): DepartmentCount[] {
 /**
  * Desglose de departamentos por sitio, usado para armar el marcador
  * compuesto del mapa: para cada sitio, la lista de departamentos con
- * tickets *abiertos* (open/in_progress), ordenada de mayor a menor cantidad.
+ * tickets *abiertos* (status open), ordenada de mayor a menor cantidad.
  * Si un sitio no tiene tickets abiertos, cae al departamento históricamente
  * más frecuente en ese sitio (para no dejar el marcador sin ícono).
  */

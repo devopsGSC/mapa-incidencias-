@@ -14,16 +14,10 @@ interface DetailDrawerProps {
   onClose: () => void;
 }
 
-const STATUS_FILTERS: (TicketStatus | "all")[] = [
-  "all",
-  "open",
-  "in_progress",
-  "resolved",
-  "closed",
-];
+const STATUS_FILTERS: (TicketStatus | "all")[] = ["all", "open", "resolved", "closed"];
 
 function isOpenStatus(status: TicketStatus): boolean {
-  return status === "open" || status === "in_progress";
+  return status === "open";
 }
 
 export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
