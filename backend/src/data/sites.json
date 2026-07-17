@@ -1,12 +1,12 @@
 {
   "sites": [
-    { "id": 1, "name": "Acajutla", "type": "aduana_maritima", "lat": 13.577, "lng": -89.8317 },
-    { "id": 2, "name": "La Hachadura", "type": "aduana_terrestre", "lat": 13.8599, "lng": -90.0871 },
-    { "id": 3, "name": "El Amatillo", "type": "aduana_terrestre", "lat": 13.5979, "lng": -87.7678 },
-    { "id": 4, "name": "El Poy", "type": "aduana_terrestre", "lat": 14.3726, "lng": -89.2096 },
-    { "id": 5, "name": "Anguiatú", "type": "aduana_terrestre", "lat": 14.4121, "lng": -89.4365 },
+    { "id": 1, "name": "Acajutla", "type": "aduana_maritima", "lat": 13.5928, "lng": -89.8331 },
+    { "id": 2, "name": "La Hachadura", "type": "aduana_terrestre", "lat": 13.8494, "lng": -90.0964 },
+    { "id": 3, "name": "El Amatillo", "type": "aduana_terrestre", "lat": 13.2308, "lng": -87.7136 },
+    { "id": 4, "name": "El Poy", "type": "aduana_terrestre", "lat": 14.3733, "lng": -88.8494 },
+    { "id": 5, "name": "Anguiatú", "type": "aduana_terrestre", "lat": 14.4181, "lng": -89.4128 },
     { "id": 6, "name": "San Bartolo", "type": "aduana_terrestre", "lat": 13.7027, "lng": -89.0989 },
-    { "id": 7, "name": "Aeropuerto Internacional", "type": "aduana_aerea", "lat": 13.4514, "lng": -89.0523 },
+    { "id": 7, "name": "Aeropuerto Internacional", "type": "aduana_aerea", "lat": 13.4409, "lng": -89.0558 },
     { "id": 8, "name": "Fardos Postales", "type": "sede", "lat": 13.6989, "lng": -89.1914 },
     { "id": 51, "name": "Santa Elena Oficina Central", "type": "sede", "lat": 13.662222, "lng": -89.254222 }
   ]

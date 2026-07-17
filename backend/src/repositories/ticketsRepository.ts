@@ -31,6 +31,12 @@ const PRIORITY_ID_MAP: Record<number, TicketPriority> = {
   4: "critical", // DB: "emergency"
 };
 
+// Único lugar que sabe cuál es, dentro de nuestro vocabulario ya traducido
+// (TicketPriority), el valor que cuenta como "crítico" para totalCritical y
+// criticalOpen — así ambos cálculos quedan atados a la misma fuente en vez
+// de repetir el literal "critical" en cada comparación.
+const CRITICAL_PRIORITY: TicketPriority = "critical";
+
 // Un par de nombres de departamento no calzan exactamente con el acento que
 // usa la UI (ej. "Tecnologia" sin tilde en la base).
 const DEPARTMENT_NAME_FIXES: Record<string, string> = {
@@ -210,13 +216,13 @@ class MySqlTicketsRepository implements TicketsRepository {
         siteEntry.total += 1;
         if (isOpenStatus(ticket.status)) {
           siteEntry.open += 1;
-          if (ticket.priority === "critical") siteEntry.criticalOpen += 1;
+          if (ticket.priority === CRITICAL_PRIORITY) siteEntry.criticalOpen += 1;
         }
       }
 
       if (isOpenStatus(ticket.status)) {
         totalOpen += 1;
-        if (ticket.priority === "critical") totalCritical += 1;
+        if (ticket.priority === CRITICAL_PRIORITY) totalCritical += 1;
       }
 
       if (ticket.status === "resolved" && isToday(ticket.updatedAt)) {
