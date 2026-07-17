@@ -1,37 +1,86 @@
 import { Server } from "socket.io";
-import { advanceRandomTicket, createLiveTicket } from "../data/store";
+import { readOnlyQuery } from "../db";
+import {
+  loadValidAduanaIds,
+  mapTicketRow,
+  TICKETS_SELECT,
+  TicketRow,
+} from "../repositories/ticketsRepository";
 
-const MIN_INTERVAL_MS = 8000;
-const MAX_INTERVAL_MS = 15000;
+const POLL_INTERVAL_MS = 20000; // 20s (rango pedido: 15-30s)
 
-function randomInterval(): number {
-  return Math.floor(
-    Math.random() * (MAX_INTERVAL_MS - MIN_INTERVAL_MS + 1) + MIN_INTERVAL_MS
-  );
+/**
+ * El "watermark" (marca de hasta dónde ya revisamos) se guarda SIEMPRE como
+ * el string crudo que devuelve MySQL ("YYYY-MM-DD HH:MM:SS"), nunca como un
+ * objeto Date de JS. Si se pasara un Date como parámetro de consulta,
+ * mysql2 lo reconvierte usando la timezone LOCAL del proceso de Node al
+ * serializarlo — y el servidor de la base tiene varias horas de desfase de
+ * reloj respecto a este proceso, lo que hacía que el watermark nunca
+ * "alcanzara" el reloj real de la base y el poller reemitiera los mismos
+ * tickets en cada ciclo. Comparando string-contra-string (formato de ancho
+ * fijo, así que el orden lexicográfico == orden cronológico) todo queda
+ * autoconsistente con el propio reloj de la base, sin importar el desfase.
+ */
+async function fetchWatermark(): Promise<string> {
+  const [row] = await readOnlyQuery<{ watermark: string }>("SELECT NOW() AS watermark");
+  return row.watermark;
+}
+
+function maxRawDatetime(a: string, b: string | null): string {
+  if (!b) return a;
+  return b > a ? b : a;
 }
 
 /**
- * Simula actividad en vivo de la mesa de ayuda: cada 8-15s crea un ticket
- * nuevo o hace avanzar el estado de uno existente, emitiendo el evento
- * correspondiente por socket.io. Al migrar a osTicket real, esto se
- * reemplaza por listeners de cambios reales (webhooks, polling a la BD, etc).
+ * Polling real contra ost_ticket: cada POLL_INTERVAL_MS busca tickets
+ * creados o actualizados (lastupdate) desde el último watermark y emite
+ * ticket:new / ticket:updated por socket.io con la misma forma de Ticket
+ * que ya consume el frontend. Reemplaza al generador mock — el nombre de
+ * la función se mantiene para no tocar el import en index.ts.
  */
 export function startLiveSimulator(io: Server): void {
-  const tick = () => {
-    const shouldCreateNew = Math.random() < 0.55;
+  let watermark: string;
 
-    if (shouldCreateNew) {
-      const ticket = createLiveTicket();
-      io.emit("ticket:new", ticket);
-    } else {
-      const ticket = advanceRandomTicket();
-      if (ticket) {
-        io.emit("ticket:updated", ticket);
+  const tick = async () => {
+    try {
+      const currentWatermark = watermark;
+      const [rows, validAduanaIds] = await Promise.all([
+        readOnlyQuery<TicketRow>(
+          `${TICKETS_SELECT} AND (t.created > ? OR t.lastupdate > ?) ORDER BY t.lastupdate ASC`,
+          [currentWatermark, currentWatermark]
+        ),
+        loadValidAduanaIds(),
+      ]);
+
+      let nextWatermark = currentWatermark;
+      for (const row of rows) {
+        const ticket = mapTicketRow(row, validAduanaIds);
+        const isNewTicket = row.created > currentWatermark;
+        io.emit(isNewTicket ? "ticket:new" : "ticket:updated", ticket);
+        nextWatermark = maxRawDatetime(nextWatermark, row.created);
+        nextWatermark = maxRawDatetime(nextWatermark, row.lastupdate);
       }
-    }
 
-    setTimeout(tick, randomInterval());
+      watermark = nextWatermark;
+
+      // Señal liviana en CADA ciclo (haya o no cambios), para que el
+      // frontend pueda mostrar "sigue sincronizando" incluso cuando no
+      // llega ningún ticket:new/ticket:updated por un rato.
+      io.emit("sync:heartbeat", { at: new Date().toISOString(), checked: rows.length });
+    } catch (error) {
+      console.error("[poller] error consultando tickets:", (error as Error).message);
+      // No avanzamos el watermark si falló: el próximo poll reintenta la misma ventana.
+    } finally {
+      setTimeout(tick, POLL_INTERVAL_MS);
+    }
   };
 
-  setTimeout(tick, randomInterval());
+  fetchWatermark()
+    .then((initial) => {
+      watermark = initial;
+      setTimeout(tick, POLL_INTERVAL_MS);
+    })
+    .catch((error) => {
+      console.error("[poller] no se pudo obtener el watermark inicial:", error.message);
+    });
 }

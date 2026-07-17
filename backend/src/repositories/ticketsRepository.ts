@@ -1,3 +1,4 @@
+import { readOnlyQuery } from "../db";
 import {
   Ticket,
   TicketFilters,
@@ -5,22 +6,132 @@ import {
   TicketStats,
   TicketStatus,
 } from "../types";
-import { getAllTickets, isOpenStatus } from "../data/store";
 import { sitesRepository } from "./sitesRepository";
 
-const STATUSES: TicketStatus[] = ["open", "in_progress", "resolved", "closed"];
+const STATUSES: TicketStatus[] = ["open", "resolved", "closed"];
 const PRIORITIES: TicketPriority[] = ["low", "normal", "high", "critical"];
 const TREND_DAYS = 30;
 
+// osTicket: ost_ticket_status.id -> nuestro TicketStatus. Archivado(4) y
+// Borrado(5) quedan fuera del dashboard (no relevantes para operación diaria).
+const STATUS_ID_MAP: Record<number, TicketStatus> = {
+  1: "open", // Abierto
+  2: "resolved", // Resuelto
+  3: "closed", // Cerrado
+};
+const RELEVANT_STATUS_IDS = Object.keys(STATUS_ID_MAP).join(",");
+
+// ost_ticket__cdata.priority guarda el ID de ost_ticket_priority como texto
+// ("1".."4"), no la palabra. El valor interno de "crítica" en la base es
+// "emergency", no "critical" — acá se traduce al vocabulario que ya usa la UI.
+const PRIORITY_ID_MAP: Record<number, TicketPriority> = {
+  1: "low",
+  2: "normal",
+  3: "high",
+  4: "critical", // DB: "emergency"
+};
+
+// Un par de nombres de departamento no calzan exactamente con el acento que
+// usa la UI (ej. "Tecnologia" sin tilde en la base).
+const DEPARTMENT_NAME_FIXES: Record<string, string> = {
+  Tecnologia: "Tecnología",
+};
+
+function isOpenStatus(status: TicketStatus): boolean {
+  return status === "open";
+}
+
+interface TicketRow {
+  ticketId: number;
+  statusId: number;
+  created: string; // raw MySQL "YYYY-MM-DD HH:MM:SS" (ver dateStrings en db.ts)
+  lastupdate: string | null;
+  subject: string | null;
+  priorityRaw: string | null;
+  aduanaRaw: string | null;
+  departmentName: string | null;
+  requesterName: string | null;
+}
+
 /**
- * Capa de acceso a datos de tickets. Hoy lee del store en memoria (mock);
- * al migrar a osTicket real, reemplazar InMemoryTicketsRepository por una
- * implementación que consulte MySQL, manteniendo esta misma interfaz para
- * que rutas de Express y frontend no requieran cambios.
+ * Convierte un DATETIME crudo de MySQL a ISO 8601. Verificado directamente
+ * contra el servidor real (NOW()/UTC_TIMESTAMP() comparados en el mismo
+ * instante contra el reloj de este proceso): la base guarda sus timestamps
+ * ya en UTC, así que basta con marcarlos como tales — nunca dejamos que el
+ * driver los reinterprete con la timezone local del proceso de Node (eso
+ * fue justo la causa del bug de reenvío duplicado en el poller, y también
+ * desfasaba 6h todas las fechas mostradas en la UI).
  */
-export interface TicketsRepository {
-  findAll(filters?: TicketFilters): Ticket[];
-  getStats(): TicketStats;
+function mysqlDatetimeToIso(raw: string): string {
+  return new Date(`${raw.replace(" ", "T")}Z`).toISOString();
+}
+
+/**
+ * Extrae el ID numérico inicial del texto libre de cdata.aduana, que en la
+ * base real viene como "3,El Amatillo" o, en tickets más viejos, como solo
+ * "6" (sin nombre). Nunca se confía en el nombre que venga en ese texto.
+ */
+function extractAduanaId(raw: string | null): number | null {
+  if (!raw) return null;
+  const match = /^(\d+)/.exec(raw.trim());
+  return match ? Number(match[1]) : null;
+}
+
+/** IDs válidos de la lista oficial de sitios/aduanas (ost_list_items, list_id=2). */
+async function loadValidAduanaIds(): Promise<Set<number>> {
+  const rows = await readOnlyQuery<{ id: number }>(
+    "SELECT id FROM ost_list_items WHERE list_id = 2"
+  );
+  return new Set(rows.map((row) => row.id));
+}
+
+function mapRow(row: TicketRow, validAduanaIds: Set<number>): Ticket {
+  const aduanaId = extractAduanaId(row.aduanaRaw);
+  const siteId = aduanaId !== null && validAduanaIds.has(aduanaId) ? String(aduanaId) : "";
+
+  const priorityId = row.priorityRaw ? parseInt(row.priorityRaw, 10) : NaN;
+  const priority = PRIORITY_ID_MAP[priorityId] ?? "normal";
+
+  const departmentRaw = (row.departmentName ?? "").trim();
+  const department = DEPARTMENT_NAME_FIXES[departmentRaw] ?? (departmentRaw || "Sin departamento");
+
+  return {
+    id: `TCK-${row.ticketId}`,
+    subject: row.subject?.trim() || "(Sin asunto)",
+    status: STATUS_ID_MAP[row.statusId] ?? "open",
+    priority,
+    department,
+    siteId,
+    createdAt: mysqlDatetimeToIso(row.created),
+    updatedAt: mysqlDatetimeToIso(row.lastupdate ?? row.created),
+    requester: row.requesterName?.trim() || "Desconocido",
+  };
+}
+
+const TICKETS_SELECT = `
+  SELECT
+    t.ticket_id  AS ticketId,
+    t.status_id  AS statusId,
+    t.created    AS created,
+    t.lastupdate AS lastupdate,
+    cd.subject   AS subject,
+    cd.priority  AS priorityRaw,
+    cd.aduana    AS aduanaRaw,
+    d.name       AS departmentName,
+    u.name       AS requesterName
+  FROM ost_ticket t
+  LEFT JOIN ost_ticket__cdata cd ON cd.ticket_id = t.ticket_id
+  LEFT JOIN ost_department d ON d.id = t.dept_id
+  LEFT JOIN ost_user u ON u.id = t.user_id
+  WHERE t.status_id IN (${RELEVANT_STATUS_IDS})
+`;
+
+async function fetchAllTickets(): Promise<Ticket[]> {
+  const [rows, validAduanaIds] = await Promise.all([
+    readOnlyQuery<TicketRow>(`${TICKETS_SELECT} ORDER BY t.created DESC`),
+    loadValidAduanaIds(),
+  ]);
+  return rows.map((row) => mapRow(row, validAduanaIds));
 }
 
 function matchesFilters(ticket: Ticket, filters: TicketFilters): boolean {
@@ -44,14 +155,24 @@ function dateKey(isoDate: string): string {
   return isoDate.slice(0, 10); // YYYY-MM-DD
 }
 
-class InMemoryTicketsRepository implements TicketsRepository {
-  findAll(filters: TicketFilters = {}): Ticket[] {
-    return getAllTickets().filter((ticket) => matchesFilters(ticket, filters));
+/**
+ * Capa de acceso a datos de tickets. Lee de la base real de osTicket
+ * (solo lectura, vía readOnlyQuery) y traduce su esquema al modelo que ya
+ * consume el frontend — rutas de Express y frontend no cambiaron.
+ */
+export interface TicketsRepository {
+  findAll(filters?: TicketFilters): Promise<Ticket[]>;
+  getStats(): Promise<TicketStats>;
+}
+
+class MySqlTicketsRepository implements TicketsRepository {
+  async findAll(filters: TicketFilters = {}): Promise<Ticket[]> {
+    const tickets = await fetchAllTickets();
+    return tickets.filter((ticket) => matchesFilters(ticket, filters));
   }
 
-  getStats(): TicketStats {
-    const tickets = getAllTickets();
-    const sites = sitesRepository.findAll();
+  async getStats(): Promise<TicketStats> {
+    const [tickets, sites] = await Promise.all([fetchAllTickets(), Promise.resolve(sitesRepository.findAll())]);
 
     const byStatus = STATUSES.reduce((acc, status) => {
       acc[status] = 0;
@@ -136,4 +257,9 @@ class InMemoryTicketsRepository implements TicketsRepository {
   }
 }
 
-export const ticketsRepository: TicketsRepository = new InMemoryTicketsRepository();
+export const ticketsRepository: TicketsRepository = new MySqlTicketsRepository();
+
+// Reutilizados por el poller de socket.io (sockets/liveSimulator.ts) para no
+// duplicar la lógica de mapeo DB -> Ticket.
+export { TICKETS_SELECT, mapRow as mapTicketRow, loadValidAduanaIds, mysqlDatetimeToIso };
+export type { TicketRow };
