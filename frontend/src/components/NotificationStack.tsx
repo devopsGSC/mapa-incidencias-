@@ -10,7 +10,7 @@ interface NotificationStackProps {
   onDismiss: (id: string) => void;
 }
 
-const VISIBLE_DURATION_MS = 7500;
+const VISIBLE_DURATION_MS = 12000;
 const EXIT_DURATION_MS = 300;
 
 const PRIORITY_BORDER: Record<TicketPriority, string> = {

@@ -17,12 +17,16 @@ interface DetailDrawerProps {
 
 const STATUS_FILTERS: (TicketStatus | "all")[] = ["all", "open", "resolved", "closed"];
 
-// Umbrales del gesto de arrastre sobre el "handle" superior: bajar poco
-// contrae (si estaba expandida), bajar bastante cierra, subir expande.
-const CLOSE_DRAG_THRESHOLD = 70;
-const COLLAPSE_DRAG_THRESHOLD = 45;
-const EXPAND_DRAG_THRESHOLD = 45;
-const CLOSE_DRAG_MAX_TRANSLATE = 160;
+// Alturas en px (nunca "auto"/vh puro): animar max-height solo funciona suave
+// entre dos números concretos, así que se calculan acá y se aplican inline.
+const COMPACT_HEIGHT = 300;
+// Mismo criterio que SiteRail/KpiDock (top-[78px]) + el bottom-5 (20px) del
+// propio panel: expandida ocupa TODO el espacio libre debajo del TopBar.
+const TOPBAR_OFFSET = 78;
+const PANEL_BOTTOM_OFFSET = 20;
+const MIN_DRAG_HEIGHT = 120; // piso visual mientras se arrastra hacia abajo
+const CLOSE_HEIGHT_THRESHOLD = 160; // al soltar por debajo de esto, cierra
+const EXPAND_HEIGHT_THRESHOLD = COMPACT_HEIGHT + 40; // al soltar por encima de esto, queda expandida
 
 function isOpenStatus(status: TicketStatus): boolean {
   return status === "open";
@@ -34,6 +38,7 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);
+  const dragStartHeight = useRef(COMPACT_HEIGHT);
 
   useEffect(() => {
     setStatusFilter("all");
@@ -53,8 +58,22 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
     return tickets.filter((t) => t.siteId === site.id && isOpenStatus(t.status)).length;
   }, [tickets, site]);
 
+  const expandedHeight =
+    typeof window !== "undefined"
+      ? window.innerHeight - TOPBAR_OFFSET - PANEL_BOTTOM_OFFSET
+      : COMPACT_HEIGHT;
+  const restingHeight = expanded ? expandedHeight : COMPACT_HEIGHT;
+  const liveHeight = dragging
+    ? Math.min(Math.max(dragStartHeight.current - dragY, MIN_DRAG_HEIGHT), expandedHeight)
+    : restingHeight;
+
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // Sin esto, arrastrar con mouse sobre el nombre del sitio o los filtros
+    // dispara la selección de texto nativa del navegador (el resaltado azul),
+    // que compite con el gesto y lo corta a mitad de camino.
+    event.preventDefault();
     dragStartY.current = event.clientY;
+    dragStartHeight.current = restingHeight;
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -66,17 +85,15 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
 
   const endDrag = () => {
     if (dragStartY.current === null) return;
-    const delta = dragY;
+    const finalHeight = liveHeight;
     dragStartY.current = null;
     setDragging(false);
     setDragY(0);
 
-    if (delta > CLOSE_DRAG_THRESHOLD) {
+    if (finalHeight <= CLOSE_HEIGHT_THRESHOLD) {
       onClose();
-    } else if (delta > COLLAPSE_DRAG_THRESHOLD && expanded) {
-      setExpanded(false);
-    } else if (delta < -EXPAND_DRAG_THRESHOLD) {
-      setExpanded(true);
+    } else {
+      setExpanded(finalHeight >= EXPAND_HEIGHT_THRESHOLD);
     }
   };
 
@@ -84,21 +101,14 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
 
   return (
     <div
-      className={`glass-panel fixed bottom-5 left-5 right-[320px] z-[15] flex flex-col overflow-hidden px-5 pb-4 pt-1.5 transition-all duration-200 ease-out ${
-        expanded ? "max-h-[75vh]" : "max-h-[300px]"
-      }`}
-      style={
-        dragging
-          ? {
-              transform: `translateY(${Math.max(0, Math.min(dragY, CLOSE_DRAG_MAX_TRANSLATE))}px)`,
-              opacity: dragY > 0 ? Math.max(1 - dragY / 220, 0.4) : 1,
-              transition: "none",
-            }
-          : undefined
-      }
+      className="glass-panel fixed bottom-5 left-5 right-[320px] z-[15] flex flex-col overflow-hidden px-5 pb-4 pt-1"
+      style={{
+        maxHeight: `${liveHeight}px`,
+        transition: dragging ? "none" : "max-height 200ms ease-out",
+      }}
     >
       <div
-        className="-mx-5 mb-2 flex shrink-0 cursor-grab touch-none justify-center py-1 active:cursor-grabbing"
+        className="-mx-5 -mt-1 flex shrink-0 cursor-grab touch-none select-none flex-col active:cursor-grabbing"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
@@ -106,42 +116,46 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
         aria-label="Deslizar para expandir o cerrar"
         role="separator"
       >
-        <span className="h-1 w-10 rounded-full bg-white/15" />
-      </div>
-
-      <div className="mb-3 flex shrink-0 items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-display truncate text-lg font-semibold text-[color:var(--text)]">
-            {site.name}
-          </p>
-          <p className="mono-label text-[10.5px] text-[color:var(--muted)]">
-            {SITE_TYPE_LABELS[site.type].toUpperCase()} · {openCount} TICKETS ABIERTOS
-          </p>
+        <div className="flex justify-center py-2.5">
+          <span className="h-1.5 w-12 rounded-full bg-white/20" />
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-shrink-0 rounded-md border border-[color:var(--glass-border)] px-2.5 py-1 text-[11px] text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)]"
-        >
-          Cerrar
-        </button>
-      </div>
 
-      <div className="mb-3 flex shrink-0 flex-wrap gap-1">
-        {STATUS_FILTERS.map((status) => (
+        <div className="mb-3 flex items-baseline justify-between gap-3 px-5">
+          <div className="min-w-0">
+            <p className="font-display truncate text-lg font-semibold text-[color:var(--text)]">
+              {site.name}
+            </p>
+            <p className="mono-label text-[10.5px] text-[color:var(--muted)]">
+              {SITE_TYPE_LABELS[site.type].toUpperCase()} · {openCount} TICKETS ABIERTOS
+            </p>
+          </div>
           <button
-            key={status}
             type="button"
-            onClick={() => setStatusFilter(status)}
-            className={`mono-label rounded-full px-2.5 py-1 text-[10px] transition-colors ${
-              statusFilter === status
-                ? "bg-[#1A294C] text-[#7099FF]"
-                : "text-[color:var(--muted)] hover:text-[color:var(--text)]"
-            }`}
+            onClick={onClose}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="flex-shrink-0 rounded-md border border-[color:var(--glass-border)] px-2.5 py-1 text-[11px] text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)]"
           >
-            {status === "all" ? "TODOS" : STATUS_LABELS[status].toUpperCase()}
+            Cerrar
           </button>
-        ))}
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-1 px-5">
+          {STATUS_FILTERS.map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              onPointerDown={(event) => event.stopPropagation()}
+              className={`mono-label rounded-full px-2.5 py-1 text-[10px] transition-colors ${
+                statusFilter === status
+                  ? "bg-[#1A294C] text-[#7099FF]"
+                  : "text-[color:var(--muted)] hover:text-[color:var(--text)]"
+              }`}
+            >
+              {status === "all" ? "TODOS" : STATUS_LABELS[status].toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="thin-scroll grid min-h-0 flex-1 grid-cols-1 gap-2.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
