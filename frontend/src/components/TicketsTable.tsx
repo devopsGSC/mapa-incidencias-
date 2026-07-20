@@ -1,3 +1,4 @@
+import { IconExternalLink } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { DepartmentIcon } from "../lib/departmentIcons";
 import {
@@ -111,6 +112,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
               <th className="px-3 py-2 font-medium">Asunto</th>
               <th className="px-3 py-2 font-medium">Sitio</th>
               <th className="px-3 py-2 font-medium">Depto.</th>
+              <th className="px-3 py-2 font-medium">Tema</th>
               <th className="min-w-[110px] px-3 py-2 font-medium">Estado</th>
               <th className="min-w-[110px] px-3 py-2 font-medium">Prioridad</th>
               <th className="px-3 py-2 font-medium">Solicitante</th>
@@ -127,7 +129,20 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
                   {ticket.id}
                 </td>
                 <td className="max-w-xs truncate px-3 py-2 text-[color:var(--text)]">
-                  {ticket.subject}
+                  {ticket.osTicketUrl ? (
+                    <a
+                      href={ticket.osTicketUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 hover:text-[color:var(--cyan)] hover:underline"
+                      title="Ver ticket en osTicket"
+                    >
+                      <span className="truncate">{ticket.subject}</span>
+                      <IconExternalLink size={12} stroke={2} className="flex-shrink-0" />
+                    </a>
+                  ) : (
+                    ticket.subject
+                  )}
                 </td>
                 <td className="px-3 py-2 text-[color:var(--muted)]">
                   {siteNameById.get(ticket.siteId) ?? ticket.siteId}
@@ -137,6 +152,9 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
                     <DepartmentIcon department={ticket.department} size={13} />
                     {ticket.department}
                   </span>
+                </td>
+                <td className="max-w-[160px] truncate px-3 py-2 text-[color:var(--muted)]">
+                  {ticket.helpTopic}
                 </td>
                 <td className="min-w-[110px] px-3 py-2">
                   <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
@@ -169,7 +187,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="px-3 py-8 text-center text-[color:var(--muted)]"
                 >
                   No hay tickets que coincidan con los filtros.

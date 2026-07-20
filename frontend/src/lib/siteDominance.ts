@@ -60,7 +60,7 @@ export function computeSiteDepartmentBreakdown(tickets: Ticket[]): Map<string, D
 export function computeSitePriorityPresence(tickets: Ticket[]): Map<string, PriorityPresence> {
   const result = new Map<string, PriorityPresence>();
   for (const [siteId, siteTickets] of groupTicketsBySite(tickets)) {
-    const presence: PriorityPresence = { low: false, normal: false, high: false, critical: false };
+    const presence: PriorityPresence = { low: false, normal: false, high: false, urgente: false };
     for (const ticket of siteTickets) {
       if (isOpenStatus(ticket.status)) {
         presence[ticket.priority] = true;

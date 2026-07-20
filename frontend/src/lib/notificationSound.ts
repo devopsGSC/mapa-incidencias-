@@ -64,7 +64,7 @@ export function playTicketChime(priority: TicketPriority) {
   const ctx = getContext();
   if (!ctx || ctx.state === "suspended") return;
 
-  const isUrgent = priority === "critical" || priority === "high";
+  const isUrgent = priority === "urgente" || priority === "high";
   const freqs = isUrgent ? [880, 1108.73] : [660, 880];
   const peakGain = isUrgent ? 0.22 : 0.14;
   const now = ctx.currentTime;

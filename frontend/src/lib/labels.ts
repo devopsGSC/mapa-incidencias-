@@ -10,7 +10,7 @@ export const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: "Baja",
   normal: "Normal",
   high: "Alta",
-  critical: "Crítica",
+  urgente: "Urgente",
 };
 
 export const SITE_TYPE_LABELS: Record<SiteType, string> = {
@@ -34,13 +34,13 @@ export const PRIORITY_BADGE_CLASSES: Record<TicketPriority, string> = {
   low: "bg-[#1E2737] text-[#8390A2] ring-1 ring-inset ring-[#64748B]/30",
   normal: "bg-[#1A294C] text-[#7099FF] ring-1 ring-inset ring-[#4C7FFF]/30",
   high: "bg-[#383025] text-[#F7B84F] ring-1 ring-inset ring-[#F5A623]/30",
-  critical: "bg-[#3A2032] text-[#FF718A] ring-1 ring-inset ring-[#FF4D6D]/30",
+  urgente: "bg-[#3A2032] text-[#FF718A] ring-1 ring-inset ring-[#FF4D6D]/30",
 };
 
-export type SiteSeverity = "idle" | "warning" | "critical";
+export type SiteSeverity = "idle" | "warning" | "urgente";
 
-export function getSiteSeverity(stat: Pick<SiteStat, "open" | "criticalOpen">): SiteSeverity {
-  if (stat.criticalOpen > 0) return "critical";
+export function getSiteSeverity(stat: Pick<SiteStat, "open" | "urgenteOpen">): SiteSeverity {
+  if (stat.urgenteOpen > 0) return "urgente";
   if (stat.open > 0) return "warning";
   return "idle";
 }
@@ -48,7 +48,7 @@ export function getSiteSeverity(stat: Pick<SiteStat, "open" | "criticalOpen">): 
 export const SEVERITY_COLORS: Record<SiteSeverity, string> = {
   idle: "#64748B",
   warning: "#F5A623",
-  critical: "#FF4D6D",
+  urgente: "#FF4D6D",
 };
 
 export const STATUS_CHART_COLORS: Record<TicketStatus, string> = {
@@ -62,7 +62,7 @@ export const STATUS_CHART_COLORS: Record<TicketStatus, string> = {
 export const STATUS_DOT_COLORS = STATUS_CHART_COLORS;
 
 export const PRIORITY_DOT_COLORS: Record<TicketPriority, string> = {
-  critical: "#FF4D6D",
+  urgente: "#FF4D6D",
   high: "#F5A623",
   normal: "#4C7FFF",
   low: "#34D399",

@@ -37,17 +37,17 @@ const iconCache = new Map<string, L.DivIcon>();
 
 /**
  * Aro de prioridad: 4 cuadrantes fijos en sentido horario desde las 12
- * (crítica, alta, normal, baja). Cada cuadrante se pinta con el color de su
+ * (urgente, alta, normal, baja). Cada cuadrante se pinta con el color de su
  * rol SOLO si esa prioridad tiene al menos un ticket abierto en el sitio;
  * si no, queda en gris neutro (var(--border)). No es proporcional a la
  * cantidad de tickets, solo indica presencia/ausencia.
  */
 function priorityRingBackground(presence: PriorityPresence): string {
-  const critical = presence.critical ? "var(--fill-danger)" : "var(--border)";
+  const urgente = presence.urgente ? "var(--fill-danger)" : "var(--border)";
   const high = presence.high ? "var(--fill-warning)" : "var(--border)";
   const normal = presence.normal ? "var(--fill-accent)" : "var(--border)";
   const low = presence.low ? "var(--fill-success)" : "var(--border)";
-  return `conic-gradient(from 0deg, ${critical} 0% 25%, ${high} 25% 50%, ${normal} 50% 75%, ${low} 75% 100%)`;
+  return `conic-gradient(from 0deg, ${urgente} 0% 25%, ${high} 25% 50%, ${normal} 50% 75%, ${low} 75% 100%)`;
 }
 
 /**
@@ -83,11 +83,11 @@ export function buildSiteMarkerIcon(
 
   const selectedRing = selected ? "0 0 0 3px rgba(62,214,196,0.55)," : "";
   const hasOpenTickets =
-    priorityPresence.critical || priorityPresence.high || priorityPresence.normal || priorityPresence.low;
-  // Rojo pulsante para sitios con crítico abierto (ver .marker-pulse); azul
+    priorityPresence.urgente || priorityPresence.high || priorityPresence.normal || priorityPresence.low;
+  // Rojo pulsante para sitios con urgente abierto (ver .marker-pulse); azul
   // más sutil para sitios con cualquier otro ticket abierto, así se
   // distingue de un sitio realmente sin nada pendiente (sin glow).
-  const pulseClass = priorityPresence.critical
+  const pulseClass = priorityPresence.urgente
     ? "marker-pulse"
     : hasOpenTickets
       ? "marker-pulse-open"

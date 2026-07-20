@@ -9,15 +9,15 @@ interface SiteRailProps {
   onSelectSite: (site: Site) => void;
 }
 
-const SEVERITY_RANK: Record<SiteSeverity, number> = { critical: 0, warning: 1, idle: 2 };
+const SEVERITY_RANK: Record<SiteSeverity, number> = { urgente: 0, warning: 1, idle: 2 };
 
 export function SiteRail({ sites, siteStatsById, selectedSiteId, onSelectSite }: SiteRailProps) {
   const sorted = useMemo(() => {
     return [...sites].sort((a, b) => {
       const statA = siteStatsById.get(a.id);
       const statB = siteStatsById.get(b.id);
-      const sevA = getSiteSeverity({ open: statA?.open ?? 0, criticalOpen: statA?.criticalOpen ?? 0 });
-      const sevB = getSiteSeverity({ open: statB?.open ?? 0, criticalOpen: statB?.criticalOpen ?? 0 });
+      const sevA = getSiteSeverity({ open: statA?.open ?? 0, urgenteOpen: statA?.urgenteOpen ?? 0 });
+      const sevB = getSiteSeverity({ open: statB?.open ?? 0, urgenteOpen: statB?.urgenteOpen ?? 0 });
       if (SEVERITY_RANK[sevA] !== SEVERITY_RANK[sevB]) {
         return SEVERITY_RANK[sevA] - SEVERITY_RANK[sevB];
       }
@@ -28,12 +28,12 @@ export function SiteRail({ sites, siteStatsById, selectedSiteId, onSelectSite }:
   return (
     <div className="glass-panel fixed bottom-5 right-5 top-[78px] z-10 flex w-[280px] flex-col overflow-hidden">
       <h3 className="mono-label border-b border-[color:var(--glass-border)] px-4 py-3.5 text-[11px] text-[color:var(--muted)]">
-        Sitios · ordenado por severidad
+        Sitios
       </h3>
       <div className="thin-scroll flex-1 overflow-y-auto">
         {sorted.map((site) => {
           const stat = siteStatsById.get(site.id);
-          const severity = getSiteSeverity({ open: stat?.open ?? 0, criticalOpen: stat?.criticalOpen ?? 0 });
+          const severity = getSiteSeverity({ open: stat?.open ?? 0, urgenteOpen: stat?.urgenteOpen ?? 0 });
           const active = site.id === selectedSiteId;
 
           return (

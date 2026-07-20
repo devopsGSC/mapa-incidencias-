@@ -14,7 +14,7 @@ const VISIBLE_DURATION_MS = 7500;
 const EXIT_DURATION_MS = 300;
 
 const PRIORITY_BORDER: Record<TicketPriority, string> = {
-  critical: "var(--red)",
+  urgente: "var(--red)",
   high: "var(--amber)",
   normal: "var(--blue)",
   low: "var(--muted-2)",
@@ -92,9 +92,21 @@ function Toast({ notification, siteName, onDismiss }: ToastProps) {
         <p className="mono-label text-sm text-[color:var(--cyan)]">
           Nuevo ticket · {ticket.id}
         </p>
-        <p className="mt-1 line-clamp-2 text-xl font-medium text-[color:var(--text)]">
-          {ticket.subject}
-        </p>
+        {ticket.osTicketUrl ? (
+          <a
+            href={ticket.osTicketUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 line-clamp-2 block text-xl font-medium text-[color:var(--text)] hover:text-[color:var(--cyan)] hover:underline"
+            title="Ver ticket en osTicket"
+          >
+            {ticket.subject}
+          </a>
+        ) : (
+          <p className="mt-1 line-clamp-2 text-xl font-medium text-[color:var(--text)]">
+            {ticket.subject}
+          </p>
+        )}
         <p className="mono-label mt-1.5 text-sm text-[color:var(--muted)]">
           {siteName} · {PRIORITY_LABELS[ticket.priority]}
         </p>

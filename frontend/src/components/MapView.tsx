@@ -18,7 +18,7 @@ const EMPTY_PRESENCE: PriorityPresence = {
   low: false,
   normal: false,
   high: false,
-  critical: false,
+  urgente: false,
 };
 
 export function MapView({

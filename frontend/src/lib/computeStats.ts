@@ -1,7 +1,7 @@
 import { Site, Ticket, TicketPriority, TicketStats, TicketStatus } from "../types";
 
 const STATUSES: TicketStatus[] = ["open", "resolved", "closed"];
-const PRIORITIES: TicketPriority[] = ["low", "normal", "high", "critical"];
+const PRIORITIES: TicketPriority[] = ["low", "normal", "high", "urgente"];
 const TREND_DAYS = 30;
 
 function isOpenStatus(status: TicketStatus): boolean {
@@ -42,12 +42,12 @@ export function computeStats(tickets: Ticket[], sites: Site[]): TicketStats {
 
   const bySiteMap = new Map<
     string,
-    { total: number; open: number; criticalOpen: number }
+    { total: number; open: number; urgenteOpen: number }
   >();
-  sites.forEach((site) => bySiteMap.set(site.id, { total: 0, open: 0, criticalOpen: 0 }));
+  sites.forEach((site) => bySiteMap.set(site.id, { total: 0, open: 0, urgenteOpen: 0 }));
 
   let totalOpen = 0;
-  let totalCritical = 0;
+  let totalUrgente = 0;
   let resolvedToday = 0;
 
   const trendMap = new Map<string, number>();
@@ -66,13 +66,13 @@ export function computeStats(tickets: Ticket[], sites: Site[]): TicketStats {
       siteEntry.total += 1;
       if (isOpenStatus(ticket.status)) {
         siteEntry.open += 1;
-        if (ticket.priority === "critical") siteEntry.criticalOpen += 1;
+        if (ticket.priority === "urgente") siteEntry.urgenteOpen += 1;
       }
     }
 
     if (isOpenStatus(ticket.status)) {
       totalOpen += 1;
-      if (ticket.priority === "critical") totalCritical += 1;
+      if (ticket.priority === "urgente") totalUrgente += 1;
     }
 
     if (ticket.status === "resolved" && isToday(ticket.updatedAt)) {
@@ -86,13 +86,13 @@ export function computeStats(tickets: Ticket[], sites: Site[]): TicketStats {
   }
 
   const bySite = sites.map((site) => {
-    const entry = bySiteMap.get(site.id) ?? { total: 0, open: 0, criticalOpen: 0 };
+    const entry = bySiteMap.get(site.id) ?? { total: 0, open: 0, urgenteOpen: 0 };
     return {
       siteId: site.id,
       siteName: site.name,
       total: entry.total,
       open: entry.open,
-      criticalOpen: entry.criticalOpen,
+      urgenteOpen: entry.urgenteOpen,
     };
   });
 
@@ -106,7 +106,7 @@ export function computeStats(tickets: Ticket[], sites: Site[]): TicketStats {
     byPriority,
     bySite,
     totalOpen,
-    totalCritical,
+    totalUrgente,
     resolvedToday,
     trend,
   };

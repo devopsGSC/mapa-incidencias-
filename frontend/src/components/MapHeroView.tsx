@@ -66,10 +66,7 @@ export function MapHeroView({
 function MapLegend() {
   return (
     <div className="glass-panel fixed bottom-5 left-5 z-10 px-3.5 py-3 text-xs text-[color:var(--muted)]">
-      <p className="mono-label mb-1.5 text-[10px] text-[color:var(--text)]">
-        Aro = prioridades abiertas
-      </p>
-      <LegendRow color="var(--fill-danger)" label="Crítica" />
+      <LegendRow color="var(--fill-danger)" label="Urgente" />
       <LegendRow color="var(--fill-warning)" label="Alta" />
       <LegendRow color="var(--fill-accent)" label="Normal" />
       <LegendRow color="var(--fill-success)" label="Baja" />

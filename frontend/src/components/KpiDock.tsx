@@ -8,10 +8,10 @@ export function KpiDock({ stats }: KpiDockProps) {
   const items: { label: string; value: number; color: string; alarm?: boolean }[] = [
     { label: "Abiertos", value: stats.totalOpen, color: "var(--blue)" },
     {
-      label: "Críticos",
-      value: stats.totalCritical,
+      label: "Urgentes",
+      value: stats.totalUrgente,
       color: "var(--red)",
-      alarm: stats.totalCritical > 0,
+      alarm: stats.totalUrgente > 0,
     },
     { label: "Total", value: stats.total, color: "var(--cyan)" },
   ];
@@ -21,7 +21,7 @@ export function KpiDock({ stats }: KpiDockProps) {
       {items.map((item) => (
         <div
           key={item.label}
-          className={`glass-panel px-3.5 py-3 ${item.alarm ? "critical-alarm" : ""}`}
+          className={`glass-panel px-3.5 py-3 ${item.alarm ? "urgente-alarm" : ""}`}
         >
           <p className="mono-label text-[10px] text-[color:var(--muted)]">{item.label}</p>
           <p
