@@ -1,6 +1,6 @@
 export type TicketStatus = "open" | "resolved" | "closed";
 
-export type TicketPriority = "low" | "normal" | "high" | "critical";
+export type TicketPriority = "low" | "normal" | "high" | "urgente";
 
 export type SiteType =
   | "aduana_terrestre"
@@ -14,10 +14,13 @@ export interface Ticket {
   status: TicketStatus;
   priority: TicketPriority;
   department: string;
+  helpTopic: string;
   siteId: string;
   createdAt: string;
   updatedAt: string;
   requester: string;
+  /** Link al detalle del ticket en el panel real de osTicket. Ausente si OSTICKET_BASE_URL no está configurada. */
+  osTicketUrl?: string;
 }
 
 export interface Site {
@@ -33,7 +36,7 @@ export interface SiteStat {
   siteName: string;
   total: number;
   open: number;
-  criticalOpen: number;
+  urgenteOpen: number;
 }
 
 export interface TrendPoint {
@@ -47,7 +50,7 @@ export interface TicketStats {
   byPriority: Record<TicketPriority, number>;
   bySite: SiteStat[];
   totalOpen: number;
-  totalCritical: number;
+  totalUrgente: number;
   resolvedToday: number;
   trend: TrendPoint[];
 }

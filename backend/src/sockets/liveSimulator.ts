@@ -1,7 +1,7 @@
 import { Server } from "socket.io";
 import { readOnlyQuery } from "../db";
 import {
-  loadValidAduanaIds,
+  loadMapRowContext,
   mapTicketRow,
   TICKETS_SELECT,
   TicketRow,
@@ -44,21 +44,23 @@ export function startLiveSimulator(io: Server): void {
   const tick = async () => {
     try {
       const currentWatermark = watermark;
-      const [rows, validAduanaIds] = await Promise.all([
+      const [rows, ctx] = await Promise.all([
         readOnlyQuery<TicketRow>(
           `${TICKETS_SELECT} AND (t.created > ? OR t.lastupdate > ?) ORDER BY t.lastupdate ASC`,
           [currentWatermark, currentWatermark]
         ),
-        loadValidAduanaIds(),
+        loadMapRowContext(),
       ]);
 
       let nextWatermark = currentWatermark;
       for (const row of rows) {
-        const ticket = mapTicketRow(row, validAduanaIds);
-        const isNewTicket = row.created > currentWatermark;
-        io.emit(isNewTicket ? "ticket:new" : "ticket:updated", ticket);
+        const ticket = mapTicketRow(row, ctx);
         nextWatermark = maxRawDatetime(nextWatermark, row.created);
         nextWatermark = maxRawDatetime(nextWatermark, row.lastupdate);
+        if (!ticket) continue; // Archivado/Borrado u otro estado excluido: no se emite
+
+        const isNewTicket = row.created > currentWatermark;
+        io.emit(isNewTicket ? "ticket:new" : "ticket:updated", ticket);
       }
 
       watermark = nextWatermark;

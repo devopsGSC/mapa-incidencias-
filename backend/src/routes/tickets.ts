@@ -5,7 +5,7 @@ import { TicketFilters, TicketPriority, TicketStatus } from "../types";
 export const ticketsRouter = Router();
 
 const VALID_STATUSES: TicketStatus[] = ["open", "resolved", "closed"];
-const VALID_PRIORITIES: TicketPriority[] = ["low", "normal", "high", "critical"];
+const VALID_PRIORITIES: TicketPriority[] = ["low", "normal", "high", "urgente"];
 
 // IMPORTANTE: /stats debe declararse antes de cualquier ruta con parámetro
 // dinámico para que Express no intente resolver "stats" como un :id.

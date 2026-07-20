@@ -8,34 +8,141 @@ import {
 } from "../types";
 import { sitesRepository } from "./sitesRepository";
 
+const PRIORITIES: TicketPriority[] = ["low", "normal", "high", "urgente"];
 const STATUSES: TicketStatus[] = ["open", "resolved", "closed"];
-const PRIORITIES: TicketPriority[] = ["low", "normal", "high", "critical"];
 const TREND_DAYS = 30;
 
-// osTicket: ost_ticket_status.id -> nuestro TicketStatus. Archivado(4) y
-// Borrado(5) quedan fuera del dashboard (no relevantes para operación diaria).
-const STATUS_ID_MAP: Record<number, TicketStatus> = {
-  1: "open", // Abierto
-  2: "resolved", // Resuelto
-  3: "closed", // Cerrado
-};
-const RELEVANT_STATUS_IDS = Object.keys(STATUS_ID_MAP).join(",");
-
-// ost_ticket__cdata.priority guarda el ID de ost_ticket_priority como texto
-// ("1".."4"), no la palabra. El valor interno de "crítica" en la base es
-// "emergency", no "critical" — acá se traduce al vocabulario que ya usa la UI.
-const PRIORITY_ID_MAP: Record<number, TicketPriority> = {
-  1: "low",
-  2: "normal",
-  3: "high",
-  4: "critical", // DB: "emergency"
-};
+// Sin barra final, para no terminar con "//scp" al armar la URL. Si no está
+// configurada, los tickets simplemente no llevan link a osTicket (ver mapRow).
+const OSTICKET_BASE_URL = process.env.OSTICKET_BASE_URL?.replace(/\/+$/, "");
 
 // Único lugar que sabe cuál es, dentro de nuestro vocabulario ya traducido
-// (TicketPriority), el valor que cuenta como "crítico" para totalCritical y
-// criticalOpen — así ambos cálculos quedan atados a la misma fuente en vez
-// de repetir el literal "critical" en cada comparación.
-const CRITICAL_PRIORITY: TicketPriority = "critical";
+// (TicketPriority), el valor que cuenta como "urgente" para totalUrgente y
+// urgenteOpen — así ambos cálculos quedan atados a la misma fuente en vez
+// de repetir el literal "urgente" en cada comparación.
+const URGENTE_PRIORITY: TicketPriority = "urgente";
+
+// osTicket guarda la PALABRA de cada prioridad/estado en ost_ticket_priority
+// / ost_ticket_status — nunca asumimos qué ID corresponde a cuál (eso fue
+// justo el origen de un bug: si alguien reordena esas tablas en osTicket,
+// un mapeo por ID fijo queda mal sin que nadie lo note). Lo único fijo acá
+// es la traducción de la palabra real de osTicket a nuestro propio
+// vocabulario de UI — una decisión de nombres nuestra, no un dato que
+// osTicket "posea".
+const PRIORITY_WORD_TO_APP: Record<string, TicketPriority> = {
+  low: "low",
+  normal: "normal",
+  high: "high",
+  emergency: "urgente", // osTicket guarda esta prioridad como "emergency", pero en la base real se muestra como "Urgente" — usamos esa misma palabra tal cual, sin reinterpretarla.
+};
+
+const STATUS_NAME_TO_APP: Record<string, TicketStatus> = {
+  Abierto: "open",
+  Resuelto: "resolved",
+  Cerrado: "closed",
+};
+
+async function loadPriorityAppById(): Promise<Map<number, TicketPriority>> {
+  const rows = await readOnlyQuery<{ priority_id: number; priority: string }>(
+    "SELECT priority_id, priority FROM ost_ticket_priority"
+  );
+  const map = new Map<number, TicketPriority>();
+  for (const row of rows) {
+    map.set(row.priority_id, PRIORITY_WORD_TO_APP[row.priority] ?? "normal");
+  }
+  return map;
+}
+
+/**
+ * null = fuera del dashboard (Archivado/Borrado, o un estado nuevo que no
+ * reconocemos por nombre): esos tickets ni cuentan en stats ni aparecen en
+ * listados, igual que antes, pero ahora la exclusión sale del campo `state`
+ * real de ost_ticket_status en vez de una lista de IDs fija.
+ */
+async function loadStatusAppById(): Promise<Map<number, TicketStatus | null>> {
+  const rows = await readOnlyQuery<{ id: number; name: string; state: string }>(
+    "SELECT id, name, state FROM ost_ticket_status"
+  );
+  const map = new Map<number, TicketStatus | null>();
+  for (const row of rows) {
+    if (row.state === "archived" || row.state === "deleted") {
+      map.set(row.id, null);
+      continue;
+    }
+    const byName = STATUS_NAME_TO_APP[row.name];
+    if (byName) {
+      map.set(row.id, byName);
+      continue;
+    }
+    // Estado nuevo sin traducción explícita: lo mejor que podemos hacer sin
+    // inventar nombres es caer al bucket "open"/"closed" genérico de osTicket.
+    map.set(row.id, row.state === "open" ? "open" : row.state === "closed" ? "closed" : null);
+  }
+  return map;
+}
+
+// "Sitio de Aduana" (list_id=2) es el campo del formulario general de
+// tickets. "CCTV Sitios" (list_id=7) es un campo aparte que solo llenan los
+// tickets del departamento CCTV (ver loadCctvSiteNameByTicketId) — un mismo
+// sitio puede tener IDs distintos en cada lista, por eso todo se resuelve
+// por NOMBRE normalizado, nunca por ID.
+const SITE_LIST_IDS = [2, 7];
+
+async function loadListItemNamesById(): Promise<Map<number, string>> {
+  const rows = await readOnlyQuery<{ id: number; value: string }>(
+    `SELECT id, value FROM ost_list_items WHERE list_id IN (${SITE_LIST_IDS.join(",")})`
+  );
+  return new Map(rows.map((row) => [row.id, row.value]));
+}
+
+/** Tema de ayuda (ost_help_topic): la categoría con la que el solicitante abrió el ticket, distinta del departamento que termina atendiéndolo. */
+async function loadHelpTopicNameById(): Promise<Map<number, string>> {
+  const rows = await readOnlyQuery<{ topic_id: number; topic: string }>(
+    "SELECT topic_id, topic FROM ost_help_topic"
+  );
+  return new Map(rows.map((row) => [row.topic_id, row.topic]));
+}
+
+function parseSingleValueJson(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    const [name] = Object.values(parsed);
+    return name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * "cctv_sitios" es un campo de formulario dinámico (no una columna física de
+ * ost_ticket__cdata): sus respuestas viven en ost_form_entry_values como
+ * JSON {"<list_item_id>":"<nombre>"}. Se busca el campo por NOMBRE en
+ * ost_form_field en vez de asumir un form_id/field_id fijo, para no
+ * hardcodear un ID interno de este install en particular.
+ */
+async function loadCctvSiteNameByTicketId(): Promise<Map<number, string>> {
+  const fieldRows = await readOnlyQuery<{ id: number; form_id: number }>(
+    "SELECT id, form_id FROM ost_form_field WHERE name = 'cctv_sitios' LIMIT 1"
+  );
+  const field = fieldRows[0];
+  if (!field) return new Map();
+
+  const rows = await readOnlyQuery<{ ticketId: number; value: string | null }>(
+    `SELECT fe.object_id AS ticketId, fev.value AS value
+     FROM ost_form_entry fe
+     JOIN ost_form_entry_values fev ON fev.entry_id = fe.id
+     WHERE fe.form_id = ? AND fev.field_id = ?`,
+    [field.form_id, field.id]
+  );
+
+  const map = new Map<number, string>();
+  for (const row of rows) {
+    const name = parseSingleValueJson(row.value);
+    if (name) map.set(row.ticketId, name);
+  }
+  return map;
+}
 
 // Un par de nombres de departamento no calzan exactamente con el acento que
 // usa la UI (ej. "Tecnologia" sin tilde en la base).
@@ -43,13 +150,10 @@ const DEPARTMENT_NAME_FIXES: Record<string, string> = {
   Tecnologia: "Tecnología",
 };
 
-function isOpenStatus(status: TicketStatus): boolean {
-  return status === "open";
-}
-
 interface TicketRow {
   ticketId: number;
   statusId: number;
+  topicId: number | null;
   created: string; // raw MySQL "YYYY-MM-DD HH:MM:SS" (ver dateStrings en db.ts)
   lastupdate: string | null;
   subject: string | null;
@@ -83,41 +187,73 @@ function extractAduanaId(raw: string | null): number | null {
   return match ? Number(match[1]) : null;
 }
 
-/** IDs válidos de la lista oficial de sitios/aduanas (ost_list_items, list_id=2). */
-async function loadValidAduanaIds(): Promise<Set<number>> {
-  const rows = await readOnlyQuery<{ id: number }>(
-    "SELECT id FROM ost_list_items WHERE list_id = 2"
-  );
-  return new Set(rows.map((row) => row.id));
+interface MapRowContext {
+  listItemNamesById: Map<number, string>;
+  cctvSiteNameByTicketId: Map<number, string>;
+  statusAppById: Map<number, TicketStatus | null>;
+  priorityAppById: Map<number, TicketPriority>;
+  helpTopicNameById: Map<number, string>;
 }
 
-function mapRow(row: TicketRow, validAduanaIds: Set<number>): Ticket {
+/**
+ * Resuelve el sitio de un ticket por NOMBRE (nunca por ID: ver comentario en
+ * SITE_LIST_IDS), y lo hace calzar con el nombre canónico ya configurado en
+ * site-metadata.json si existe uno (comparación normalizada) — así un mismo
+ * sitio escrito distinto en cada lista de osTicket ("El Poy" vs "EL Poy")
+ * termina agrupado bajo un solo siteId. Si el sitio real de osTicket todavía
+ * no tiene coordenadas asignadas, el ticket igual se resuelve con el nombre
+ * crudo (no se pierde, solo no va a tener con qué pintarse en el mapa).
+ */
+function resolveSiteId(row: TicketRow, ctx: MapRowContext): string {
   const aduanaId = extractAduanaId(row.aduanaRaw);
-  const siteId = aduanaId !== null && validAduanaIds.has(aduanaId) ? String(aduanaId) : "";
+  const rawName =
+    (aduanaId !== null ? ctx.listItemNamesById.get(aduanaId) : undefined) ??
+    ctx.cctvSiteNameByTicketId.get(row.ticketId);
+
+  if (!rawName) return "";
+
+  const configured = sitesRepository.findByNormalizedName(rawName);
+  return configured ? configured.id : rawName;
+}
+
+/** Devuelve null si el ticket debe quedar fuera del dashboard (ver loadStatusAppById). */
+function mapRow(row: TicketRow, ctx: MapRowContext): Ticket | null {
+  const status = ctx.statusAppById.get(row.statusId) ?? null;
+  if (!status) return null;
 
   const priorityId = row.priorityRaw ? parseInt(row.priorityRaw, 10) : NaN;
-  const priority = PRIORITY_ID_MAP[priorityId] ?? "normal";
+  const priority = ctx.priorityAppById.get(priorityId) ?? "normal";
 
   const departmentRaw = (row.departmentName ?? "").trim();
   const department = DEPARTMENT_NAME_FIXES[departmentRaw] ?? (departmentRaw || "Sin departamento");
+  const helpTopic = (row.topicId ? ctx.helpTopicNameById.get(row.topicId) : undefined) ?? "Sin tema";
 
   return {
     id: `TCK-${row.ticketId}`,
     subject: row.subject?.trim() || "(Sin asunto)",
-    status: STATUS_ID_MAP[row.statusId] ?? "open",
+    status,
     priority,
     department,
-    siteId,
+    helpTopic,
+    siteId: resolveSiteId(row, ctx),
     createdAt: mysqlDatetimeToIso(row.created),
     updatedAt: mysqlDatetimeToIso(row.lastupdate ?? row.created),
     requester: row.requesterName?.trim() || "Desconocido",
+    osTicketUrl: OSTICKET_BASE_URL
+      ? `${OSTICKET_BASE_URL}/scp/tickets.php?id=${row.ticketId}`
+      : undefined,
   };
 }
 
+// WHERE 1=1 es a propósito: deja que tanto fetchAllTickets como el poller de
+// liveSimulator.ts puedan agregar "AND ..." sin duplicar lógica de armado de
+// SQL. El filtro de estado (excluir Archivado/Borrado) ya NO va acá: pasa a
+// resolverse en JS vía loadStatusAppById, en vivo contra ost_ticket_status.
 const TICKETS_SELECT = `
   SELECT
     t.ticket_id  AS ticketId,
     t.status_id  AS statusId,
+    t.topic_id   AS topicId,
     t.created    AS created,
     t.lastupdate AS lastupdate,
     cd.subject   AS subject,
@@ -129,15 +265,33 @@ const TICKETS_SELECT = `
   LEFT JOIN ost_ticket__cdata cd ON cd.ticket_id = t.ticket_id
   LEFT JOIN ost_department d ON d.id = t.dept_id
   LEFT JOIN ost_user u ON u.id = t.user_id
-  WHERE t.status_id IN (${RELEVANT_STATUS_IDS})
+  WHERE 1=1
 `;
 
+async function loadMapRowContext(): Promise<MapRowContext> {
+  const [listItemNamesById, cctvSiteNameByTicketId, statusAppById, priorityAppById, helpTopicNameById] =
+    await Promise.all([
+      loadListItemNamesById(),
+      loadCctvSiteNameByTicketId(),
+      loadStatusAppById(),
+      loadPriorityAppById(),
+      loadHelpTopicNameById(),
+    ]);
+  return { listItemNamesById, cctvSiteNameByTicketId, statusAppById, priorityAppById, helpTopicNameById };
+}
+
 async function fetchAllTickets(): Promise<Ticket[]> {
-  const [rows, validAduanaIds] = await Promise.all([
+  const [rows, ctx] = await Promise.all([
     readOnlyQuery<TicketRow>(`${TICKETS_SELECT} ORDER BY t.created DESC`),
-    loadValidAduanaIds(),
+    loadMapRowContext(),
   ]);
-  return rows.map((row) => mapRow(row, validAduanaIds));
+
+  const tickets: Ticket[] = [];
+  for (const row of rows) {
+    const ticket = mapRow(row, ctx);
+    if (ticket) tickets.push(ticket);
+  }
+  return tickets;
 }
 
 function matchesFilters(ticket: Ticket, filters: TicketFilters): boolean {
@@ -145,6 +299,10 @@ function matchesFilters(ticket: Ticket, filters: TicketFilters): boolean {
   if (filters.status && ticket.status !== filters.status) return false;
   if (filters.priority && ticket.priority !== filters.priority) return false;
   return true;
+}
+
+function isOpenStatus(status: TicketStatus): boolean {
+  return status === "open";
 }
 
 function isToday(isoDate: string): boolean {
@@ -192,12 +350,12 @@ class MySqlTicketsRepository implements TicketsRepository {
 
     const bySiteMap = new Map<
       string,
-      { total: number; open: number; criticalOpen: number }
+      { total: number; open: number; urgenteOpen: number }
     >();
-    sites.forEach((site) => bySiteMap.set(site.id, { total: 0, open: 0, criticalOpen: 0 }));
+    sites.forEach((site) => bySiteMap.set(site.id, { total: 0, open: 0, urgenteOpen: 0 }));
 
     let totalOpen = 0;
-    let totalCritical = 0;
+    let totalUrgente = 0;
     let resolvedToday = 0;
 
     const trendMap = new Map<string, number>();
@@ -216,13 +374,13 @@ class MySqlTicketsRepository implements TicketsRepository {
         siteEntry.total += 1;
         if (isOpenStatus(ticket.status)) {
           siteEntry.open += 1;
-          if (ticket.priority === CRITICAL_PRIORITY) siteEntry.criticalOpen += 1;
+          if (ticket.priority === URGENTE_PRIORITY) siteEntry.urgenteOpen += 1;
         }
       }
 
       if (isOpenStatus(ticket.status)) {
         totalOpen += 1;
-        if (ticket.priority === CRITICAL_PRIORITY) totalCritical += 1;
+        if (ticket.priority === URGENTE_PRIORITY) totalUrgente += 1;
       }
 
       if (ticket.status === "resolved" && isToday(ticket.updatedAt)) {
@@ -236,13 +394,13 @@ class MySqlTicketsRepository implements TicketsRepository {
     }
 
     const bySite = sites.map((site) => {
-      const entry = bySiteMap.get(site.id) ?? { total: 0, open: 0, criticalOpen: 0 };
+      const entry = bySiteMap.get(site.id) ?? { total: 0, open: 0, urgenteOpen: 0 };
       return {
         siteId: site.id,
         siteName: site.name,
         total: entry.total,
         open: entry.open,
-        criticalOpen: entry.criticalOpen,
+        urgenteOpen: entry.urgenteOpen,
       };
     });
 
@@ -256,7 +414,7 @@ class MySqlTicketsRepository implements TicketsRepository {
       byPriority,
       bySite,
       totalOpen,
-      totalCritical,
+      totalUrgente,
       resolvedToday,
       trend,
     };
@@ -267,5 +425,5 @@ export const ticketsRepository: TicketsRepository = new MySqlTicketsRepository()
 
 // Reutilizados por el poller de socket.io (sockets/liveSimulator.ts) para no
 // duplicar la lógica de mapeo DB -> Ticket.
-export { TICKETS_SELECT, mapRow as mapTicketRow, loadValidAduanaIds, mysqlDatetimeToIso };
-export type { TicketRow };
+export { TICKETS_SELECT, mapRow as mapTicketRow, loadMapRowContext, mysqlDatetimeToIso };
+export type { TicketRow, MapRowContext };
