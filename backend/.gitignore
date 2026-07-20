@@ -1,3 +1,9 @@
 node_modules
 dist
 .env
+
+# Estado real de sitios configurados en este servidor (editado por el panel
+# admin). NO trackear: un git pull no debe pisar lo que el admin ya guardó
+# en producción. Ver src/data/site-metadata.seed.json para el seed inicial
+# y src/repositories/sitesRepository.ts para el porqué de esta excepción.
+src/data/site-metadata.json

@@ -1,0 +1,17 @@
+{
+  "sites": [
+    { "name": "Acajutla", "type": "aduana_maritima", "lat": 13.5769, "lng": -89.8317 },
+    { "name": "La Hachadura", "type": "aduana_terrestre", "lat": 13.8597, "lng": -90.0869 },
+    { "name": "El Amatillo", "type": "aduana_terrestre", "lat": 13.5953, "lng": -87.7681 },
+    { "name": "El Poy", "type": "aduana_terrestre", "lat": 14.3743, "lng": -89.214 },
+    { "name": "Anguiatú", "type": "aduana_terrestre", "lat": 14.4119, "lng": -89.4367 },
+    { "name": "San Bartolo", "type": "aduana_terrestre", "lat": 13.7027, "lng": -89.0989 },
+    { "name": "Aeropuerto Internacional", "type": "aduana_aerea", "lat": 13.4409, "lng": -89.0558 },
+    { "name": "Fardos Postales", "type": "sede", "lat": 13.6989, "lng": -89.1914 },
+    { "name": "Santa Elena Oficina Central", "type": "sede", "lat": 13.662222, "lng": -89.254222 },
+    { "name": "Las Chinamas", "type": "aduana_terrestre", "lat": 14.0175, "lng": -89.9053 },
+    { "name": "San Cristobal", "type": "aduana_terrestre", "lat": 14.184, "lng": -89.67 },
+    { "name": "Aeropuerto Terminal de Carga", "type": "aduana_aerea", "lat": 13.4409, "lng": -89.0558 },
+    { "name": "Aeropuerto Terminal de Pasajeros", "type": "aduana_aerea", "lat": 13.4409, "lng": -89.0558 }
+  ]
+}

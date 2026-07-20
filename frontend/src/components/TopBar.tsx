@@ -1,3 +1,4 @@
+import { IconChevronRight } from "@tabler/icons-react";
 import { ReactNode } from "react";
 import logo from "../img/logo_gcs_blanco.png";
 import { SoundToggle } from "./SoundToggle";
@@ -10,9 +11,18 @@ interface TopBarProps {
   onViewChange: (view: DashboardView) => void;
   connected: boolean;
   lastHeartbeatAt: Date | null;
+  onOpenAdmin: () => void;
+  checkingAdmin: boolean;
 }
 
-export function TopBar({ view, onViewChange, connected, lastHeartbeatAt }: TopBarProps) {
+export function TopBar({
+  view,
+  onViewChange,
+  connected,
+  lastHeartbeatAt,
+  onOpenAdmin,
+  checkingAdmin,
+}: TopBarProps) {
   return (
     <header className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-[#080c16] to-transparent px-5 py-4">
       <div className="flex items-center gap-3">
@@ -38,6 +48,16 @@ export function TopBar({ view, onViewChange, connected, lastHeartbeatAt }: TopBa
         </nav>
         <SoundToggle />
         <SyncStatus connected={connected} lastHeartbeatAt={lastHeartbeatAt} />
+        <button
+          type="button"
+          onClick={onOpenAdmin}
+          disabled={checkingAdmin}
+          aria-label="Acceso administrador"
+          title="Acceso administrador"
+          className="glass-panel flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:opacity-50"
+        >
+          <IconChevronRight size={16} stroke={2} />
+        </button>
       </div>
     </header>
   );
