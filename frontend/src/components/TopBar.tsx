@@ -1,4 +1,4 @@
-import { IconChevronRight } from "@tabler/icons-react";
+import { IconChevronRight, IconLogout } from "@tabler/icons-react";
 import { ReactNode } from "react";
 import logo from "../img/logo_gcs_blanco.png";
 import { SoundToggle } from "./SoundToggle";
@@ -11,8 +11,9 @@ interface TopBarProps {
   onViewChange: (view: DashboardView) => void;
   connected: boolean;
   lastHeartbeatAt: Date | null;
+  isAdmin: boolean;
   onOpenAdmin: () => void;
-  checkingAdmin: boolean;
+  onLogout: () => void;
 }
 
 export function TopBar({
@@ -20,8 +21,9 @@ export function TopBar({
   onViewChange,
   connected,
   lastHeartbeatAt,
+  isAdmin,
   onOpenAdmin,
-  checkingAdmin,
+  onLogout,
 }: TopBarProps) {
   return (
     <header className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-[#080c16] to-transparent px-5 py-4">
@@ -48,15 +50,25 @@ export function TopBar({
         </nav>
         <SoundToggle />
         <SyncStatus connected={connected} lastHeartbeatAt={lastHeartbeatAt} />
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            aria-label="Acceso administrador"
+            title="Acceso administrador"
+            className="glass-panel flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)]"
+          >
+            <IconChevronRight size={16} stroke={2} />
+          </button>
+        )}
         <button
           type="button"
-          onClick={onOpenAdmin}
-          disabled={checkingAdmin}
-          aria-label="Acceso administrador"
-          title="Acceso administrador"
-          className="glass-panel flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:opacity-50"
+          onClick={onLogout}
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
+          className="glass-panel flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)]"
         >
-          <IconChevronRight size={16} stroke={2} />
+          <IconLogout size={16} stroke={2} />
         </button>
       </div>
     </header>

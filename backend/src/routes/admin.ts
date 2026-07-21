@@ -1,59 +1,16 @@
-import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { readOnlyQuery } from "../db";
-import { ADMIN_COOKIE_NAME, getAdminEnvOrThrow, requireAdminAuth, signAdminToken } from "../auth";
+import { requireRole } from "../auth";
 import { normalizeName } from "../lib/normalizeName";
 import { sitesRepository } from "../repositories/sitesRepository";
-import { SiteType } from "../types";
+import { usersRepository } from "../repositories/usersRepository";
+import { Role, SiteType } from "../types";
 
 export const adminRouter = Router();
 
-const isProduction = process.env.NODE_ENV === "production";
-const COOKIE_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8h, igual que la expiración del JWT
-
-adminRouter.post("/login", async (req, res, next) => {
-  try {
-    const { username, password } = (req.body ?? {}) as { username?: unknown; password?: unknown };
-    if (typeof username !== "string" || typeof password !== "string") {
-      res.status(400).json({ error: "username y password son requeridos." });
-      return;
-    }
-
-    let env;
-    try {
-      env = getAdminEnvOrThrow();
-    } catch {
-      res.status(500).json({ error: "Admin no configurado en este servidor." });
-      return;
-    }
-
-    const passwordMatches =
-      username === env.username && (await bcrypt.compare(password, env.passwordHash));
-    if (!passwordMatches) {
-      res.status(401).json({ error: "Usuario o contraseña incorrectos." });
-      return;
-    }
-
-    const token = signAdminToken(username, env.jwtSecret);
-    res.cookie(ADMIN_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax",
-      maxAge: COOKIE_MAX_AGE_MS,
-    });
-    res.json({ ok: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-adminRouter.post("/logout", (_req, res) => {
-  res.clearCookie(ADMIN_COOKIE_NAME);
-  res.json({ ok: true });
-});
-
-// Todo lo registrado DESPUÉS de este .use() exige sesión admin válida.
-adminRouter.use(requireAdminAuth);
+// Todo lo registrado en este router exige sesión con rol admin — el login
+// para cualquier usuario (admin o normal) vive en routes/auth.ts.
+adminRouter.use(requireRole("admin"));
 
 // "Sitio de Aduana" (list_id=2) + "CCTV Sitios" (list_id=7): las mismas dos
 // listas que usa ticketsRepository para resolver el sitio de cada ticket
@@ -61,6 +18,7 @@ adminRouter.use(requireAdminAuth);
 // vigente en cualquiera de las dos.
 const SITE_LIST_IDS = [2, 7];
 const VALID_SITE_TYPES: SiteType[] = ["aduana_terrestre", "aduana_maritima", "aduana_aerea", "sede"];
+const VALID_ROLES: Role[] = ["admin", "normal"];
 
 async function loadRealSiteNames(): Promise<string[]> {
   const rows = await readOnlyQuery<{ value: string }>(
@@ -155,6 +113,125 @@ adminRouter.delete("/sites/:name", (req, res) => {
   const removed = sitesRepository.remove(decodeURIComponent(req.params.name));
   if (!removed) {
     res.status(404).json({ error: "Sitio no encontrado en site-metadata.json." });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+// --- Gestión de usuarios (admin-only) ---------------------------------
+
+adminRouter.get("/users", (_req, res) => {
+  res.json(usersRepository.findAll());
+});
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+adminRouter.post("/users", async (req, res, next) => {
+  try {
+    const { username, email, password, role } = (req.body ?? {}) as {
+      username?: unknown;
+      email?: unknown;
+      password?: unknown;
+      role?: unknown;
+    };
+
+    if (typeof username !== "string" || username.trim().length === 0) {
+      res.status(400).json({ error: "username es requerido." });
+      return;
+    }
+    if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
+      res.status(400).json({ error: "email es requerido y debe ser válido." });
+      return;
+    }
+    if (typeof password !== "string" || password.length < 8) {
+      res.status(400).json({ error: "password debe tener al menos 8 caracteres." });
+      return;
+    }
+    if (typeof role !== "string" || !VALID_ROLES.includes(role as Role)) {
+      res.status(400).json({ error: `role debe ser uno de: ${VALID_ROLES.join(", ")}` });
+      return;
+    }
+
+    const result = await usersRepository.create({
+      username: username.trim(),
+      email: email.trim(),
+      password,
+      role: role as Role,
+    });
+    if (!result.ok) {
+      res.status(409).json({ error: `"${username}" ya existe.` });
+      return;
+    }
+    res.status(201).json(result.user);
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.patch("/users/:username/role", (req, res) => {
+  const { role } = (req.body ?? {}) as { role?: unknown };
+  if (typeof role !== "string" || !VALID_ROLES.includes(role as Role)) {
+    res.status(400).json({ error: `role debe ser uno de: ${VALID_ROLES.join(", ")}` });
+    return;
+  }
+
+  const username = decodeURIComponent(req.params.username);
+  // Si esto degrada al último admin restante, la sesión que lo hizo se
+  // queda sin nadie que pueda revertirlo — mismo espíritu que el guard de
+  // "no borrar al último admin" de abajo.
+  if (role !== "admin") {
+    const target = usersRepository.findByUsername(username);
+    if (target?.role === "admin" && usersRepository.countAdmins() <= 1) {
+      res.status(400).json({ error: "No se puede quitar el rol admin al único admin restante." });
+      return;
+    }
+  }
+
+  const updated = usersRepository.setRole(username, role as Role);
+  if (!updated) {
+    res.status(404).json({ error: "Usuario no encontrado." });
+    return;
+  }
+  res.json(updated);
+});
+
+adminRouter.post("/users/:username/reset-password", async (req, res, next) => {
+  try {
+    const { password } = (req.body ?? {}) as { password?: unknown };
+    if (typeof password !== "string" || password.length < 8) {
+      res.status(400).json({ error: "password debe tener al menos 8 caracteres." });
+      return;
+    }
+
+    const username = decodeURIComponent(req.params.username);
+    const ok = await usersRepository.resetPassword(username, password);
+    if (!ok) {
+      res.status(404).json({ error: "Usuario no encontrado." });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.delete("/users/:username", (req, res) => {
+  const username = decodeURIComponent(req.params.username);
+
+  if (username.trim().toLowerCase() === req.user!.username.trim().toLowerCase()) {
+    res.status(400).json({ error: "No podés borrar tu propia cuenta mientras estás logueado con ella." });
+    return;
+  }
+
+  const target = usersRepository.findByUsername(username);
+  if (target?.role === "admin" && usersRepository.countAdmins() <= 1) {
+    res.status(400).json({ error: "No se puede borrar al único admin restante." });
+    return;
+  }
+
+  const removed = usersRepository.remove(username);
+  if (!removed) {
+    res.status(404).json({ error: "Usuario no encontrado." });
     return;
   }
   res.json({ ok: true });

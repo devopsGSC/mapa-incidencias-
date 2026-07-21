@@ -1,13 +1,14 @@
 import { FormEvent, useState } from "react";
-import { adminLogin } from "../api/adminClient";
+import { PasswordInput } from "../components/PasswordInput";
+import { useAuth } from "./AuthContext";
 
-interface AdminLoginFormProps {
-  onSuccess: () => void;
+interface LoginFormProps {
   autoFocus?: boolean;
 }
 
-/** Formulario de login puro, reutilizado tanto por la página /admin/login como por el modal accesible desde el dashboard. */
-export function AdminLoginForm({ onSuccess, autoFocus = true }: AdminLoginFormProps) {
+/** Formulario de login puro — lo usa el modal (LoginModal) y cualquier otro punto de entrada que se necesite a futuro. */
+export function LoginForm({ autoFocus = true }: LoginFormProps) {
+  const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -18,8 +19,7 @@ export function AdminLoginForm({ onSuccess, autoFocus = true }: AdminLoginFormPr
     setError(null);
     setSubmitting(true);
     try {
-      await adminLogin(username, password);
-      onSuccess();
+      await login(username, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
     } finally {
@@ -43,12 +43,11 @@ export function AdminLoginForm({ onSuccess, autoFocus = true }: AdminLoginFormPr
 
       <label className="block text-sm text-[color:var(--muted)]">
         Contraseña
-        <input
-          type="password"
+        <PasswordInput
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="mt-1 w-full rounded-md border border-[color:var(--glass-border)] bg-black/20 px-3 py-2 text-[color:var(--text)] outline-none focus:border-[color:var(--cyan)]"
+          className="rounded-md border border-[color:var(--glass-border)] bg-black/20 px-3 py-2 text-[color:var(--text)] outline-none focus:border-[color:var(--cyan)]"
         />
       </label>
 

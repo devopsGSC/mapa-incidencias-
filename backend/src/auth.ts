@@ -1,64 +1,85 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { Role } from "./types";
 
-export const ADMIN_COOKIE_NAME = "admin_token";
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      user?: { username: string; role: Role };
+    }
+  }
+}
+
+export const SESSION_COOKIE_NAME = "session_token";
 const SESSION_DURATION = "8h";
 
-interface AdminEnv {
-  username: string;
-  passwordHash: string;
-  jwtSecret: string;
+interface SessionPayload {
+  sub: string;
+  role: Role;
 }
 
-/**
- * Lee la config de admin recién en cada request (no al arrancar el
- * proceso): así, si todavía no se configuró ADMIN_USERNAME/
- * ADMIN_PASSWORD_HASH/JWT_SECRET en este servidor, el resto de la API
- * (pública, sin login) sigue funcionando normal — solo /api/admin/* queda
- * inutilizable hasta que se complete el .env.
- */
-function readAdminEnv(): AdminEnv | null {
-  const { ADMIN_USERNAME, ADMIN_PASSWORD_HASH, JWT_SECRET } = process.env;
-  if (!ADMIN_USERNAME || !ADMIN_PASSWORD_HASH || !JWT_SECRET) return null;
-  return { username: ADMIN_USERNAME, passwordHash: ADMIN_PASSWORD_HASH, jwtSecret: JWT_SECRET };
-}
-
-export function getAdminEnvOrThrow(): AdminEnv {
-  const env = readAdminEnv();
-  if (!env) {
-    throw new Error(
-      "Admin no configurado: faltan ADMIN_USERNAME/ADMIN_PASSWORD_HASH/JWT_SECRET en backend/.env"
-    );
+function getJwtSecretOrThrow(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("Falta JWT_SECRET en backend/.env");
   }
-  return env;
+  return secret;
 }
 
-export function signAdminToken(username: string, jwtSecret: string): string {
-  return jwt.sign({ sub: username, role: "admin" }, jwtSecret, { expiresIn: SESSION_DURATION });
+export function signSessionToken(username: string, role: Role): string {
+  return jwt.sign({ sub: username, role }, getJwtSecretOrThrow(), { expiresIn: SESSION_DURATION });
 }
 
-function verifyAdminToken(token: string, jwtSecret: string): boolean {
+function verifySessionToken(token: string): { username: string; role: Role } | null {
   try {
-    const payload = jwt.verify(token, jwtSecret);
-    return typeof payload === "object" && payload?.role === "admin";
+    const payload = jwt.verify(token, getJwtSecretOrThrow());
+    if (
+      typeof payload !== "object" ||
+      payload === null ||
+      typeof (payload as SessionPayload).sub !== "string" ||
+      ((payload as SessionPayload).role !== "admin" && (payload as SessionPayload).role !== "normal")
+    ) {
+      return null;
+    }
+    const { sub, role } = payload as SessionPayload;
+    return { username: sub, role };
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** Protege cualquier ruta /api/admin/* (menos login) — exige cookie httpOnly con JWT válido. */
-export function requireAdminAuth(req: Request, res: Response, next: NextFunction): void {
-  const env = readAdminEnv();
-  if (!env) {
-    res.status(500).json({ error: "Admin no configurado en este servidor." });
-    return;
-  }
-
-  const token = req.cookies?.[ADMIN_COOKIE_NAME];
-  if (!token || !verifyAdminToken(token, env.jwtSecret)) {
+/** Exige sesión válida (cualquier rol). Adjunta req.user. */
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  const token = req.cookies?.[SESSION_COOKIE_NAME];
+  const session = token ? verifySessionToken(token) : null;
+  if (!session) {
     res.status(401).json({ error: "No autenticado." });
     return;
   }
-
+  req.user = session;
   next();
+}
+
+/** Exige sesión válida Y que el rol esté en la lista permitida. */
+export function requireRole(...roles: Role[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const token = req.cookies?.[SESSION_COOKIE_NAME];
+    const session = token ? verifySessionToken(token) : null;
+    if (!session) {
+      res.status(401).json({ error: "No autenticado." });
+      return;
+    }
+    if (!roles.includes(session.role)) {
+      res.status(403).json({ error: "No autorizado para este recurso." });
+      return;
+    }
+    req.user = session;
+    next();
+  };
+}
+
+/** Verifica el token de sesión "a mano" (fuera del ciclo request/response de Express) — lo usa el middleware de socket.io. */
+export function verifySessionTokenRaw(token: string): { username: string; role: Role } | null {
+  return verifySessionToken(token);
 }

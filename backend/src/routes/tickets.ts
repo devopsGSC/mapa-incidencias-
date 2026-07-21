@@ -1,8 +1,11 @@
 import { Router } from "express";
+import { requireAuth } from "../auth";
 import { ticketsRepository } from "../repositories/ticketsRepository";
 import { TicketFilters, TicketPriority, TicketStatus } from "../types";
 
 export const ticketsRouter = Router();
+
+ticketsRouter.use(requireAuth);
 
 const VALID_STATUSES: TicketStatus[] = ["open", "resolved", "closed"];
 const VALID_PRIORITIES: TicketPriority[] = ["low", "normal", "high", "urgente"];

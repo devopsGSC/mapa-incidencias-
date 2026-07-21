@@ -1,5 +1,13 @@
 export type TicketStatus = "open" | "resolved" | "closed";
 
+export type Role = "admin" | "normal";
+
+export interface PublicUser {
+  username: string;
+  email: string;
+  role: Role;
+}
+
 export type TicketPriority = "low" | "normal" | "high" | "urgente";
 
 export type SiteType =

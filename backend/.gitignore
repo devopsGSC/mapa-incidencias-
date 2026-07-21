@@ -7,3 +7,8 @@ dist
 # en producción. Ver src/data/site-metadata.seed.json para el seed inicial
 # y src/repositories/sitesRepository.ts para el porqué de esta excepción.
 src/data/site-metadata.json
+
+# Estado real de usuarios/roles (editado desde el panel admin). Mismo
+# criterio que site-metadata.json: nunca trackear, ver
+# src/data/users.seed.json y src/repositories/usersRepository.ts.
+src/data/users.json

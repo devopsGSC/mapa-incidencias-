@@ -1,32 +1,8 @@
-import { Site, SiteType } from "../types";
-import { API_BASE_URL } from "./client";
+import { credentialedRequest } from "./client";
+import { AdminUserSummary, Role, Site, SiteType } from "../types";
 
-export class AdminUnauthorizedError extends Error {}
-
-async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/admin${path}`, {
-    ...init,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-
-  if (response.status === 401) {
-    throw new AdminUnauthorizedError("No autenticado.");
-  }
-
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(body?.error ?? `Error ${response.status} al consultar ${path}`);
-  }
-  return body as T;
-}
-
-export function adminLogin(username: string, password: string): Promise<{ ok: true }> {
-  return adminRequest("/login", { method: "POST", body: JSON.stringify({ username, password }) });
-}
-
-export function adminLogout(): Promise<{ ok: true }> {
-  return adminRequest("/logout", { method: "POST" });
+function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return credentialedRequest<T>(`/api/admin${path}`, init);
 }
 
 export function fetchConfiguredSites(): Promise<Site[]> {
@@ -50,4 +26,37 @@ export function upsertSite(payload: UpsertSitePayload): Promise<Site> {
 
 export function deleteSite(name: string): Promise<{ ok: true }> {
   return adminRequest(`/sites/${encodeURIComponent(name)}`, { method: "DELETE" });
+}
+
+export function fetchUsers(): Promise<AdminUserSummary[]> {
+  return adminRequest<AdminUserSummary[]>("/users");
+}
+
+export interface CreateUserPayload {
+  username: string;
+  email: string;
+  password: string;
+  role: Role;
+}
+
+export function createUser(payload: CreateUserPayload): Promise<AdminUserSummary> {
+  return adminRequest<AdminUserSummary>("/users", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function setUserRole(username: string, role: Role): Promise<AdminUserSummary> {
+  return adminRequest<AdminUserSummary>(`/users/${encodeURIComponent(username)}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function resetUserPassword(username: string, password: string): Promise<{ ok: true }> {
+  return adminRequest(`/users/${encodeURIComponent(username)}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function deleteUser(username: string): Promise<{ ok: true }> {
+  return adminRequest(`/users/${encodeURIComponent(username)}`, { method: "DELETE" });
 }

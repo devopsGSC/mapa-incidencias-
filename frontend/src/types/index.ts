@@ -1,5 +1,19 @@
 export type TicketStatus = "open" | "resolved" | "closed";
 
+export type Role = "admin" | "normal";
+
+export interface CurrentUser {
+  username: string;
+  role: Role;
+}
+
+/** Fila de la tabla de usuarios del panel admin — a diferencia de CurrentUser (la sesión propia, sin email porque el JWT no lo lleva), esta sí incluye email. */
+export interface AdminUserSummary {
+  username: string;
+  email: string;
+  role: Role;
+}
+
 export type TicketPriority = "low" | "normal" | "high" | "urgente";
 
 export type SiteType =
