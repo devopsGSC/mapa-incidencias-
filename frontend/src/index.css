@@ -33,6 +33,16 @@
   --fill-success: var(--green);
   --border: var(--slate);
   --surface-1: #131d33;
+
+  /* Paleta del panel /admin/sites: deliberadamente sobria/grayscale (a
+     diferencia del dashboard público, que sí usa color por categoría). El
+     único acento admitido acá es --border-accent/--text-accent, reservado
+     para la badge de rol "Administrador" y el ítem activo del menú lateral. */
+  --text-secondary: var(--muted);
+  --text-disabled: var(--muted-2);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-accent: var(--cyan);
+  --text-accent: var(--cyan);
 }
 
 html,
