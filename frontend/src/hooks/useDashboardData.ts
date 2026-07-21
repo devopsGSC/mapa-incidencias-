@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { fetchSites, fetchTickets } from "../api/client";
 import { computeStats } from "../lib/computeStats";
 import { playTicketChime } from "../lib/notificationSound";
@@ -64,29 +64,29 @@ export function useDashboardData() {
     setState((prev) => ({ ...prev, lastHeartbeatAt: new Date() }));
   }, []);
 
+  /**
+   * Pide el estado completo (sitios + tickets) desde cero. Se llama tanto en
+   * la conexión inicial como en cada reconexión (ver onSync en useSocket):
+   * el socket nunca reenvía eventos perdidos durante un corte, así que la
+   * única forma de no quedar desincronizado tras una reconexión es siempre
+   * volver a traer todo, no solo confiar en los eventos incrementales.
+   */
+  const loadFullState = useCallback(() => {
+    Promise.all([fetchSites(), fetchTickets()])
+      .then(([sites, tickets]) => {
+        setState((prev) => ({ ...prev, sites, tickets, loading: false, error: null }));
+      })
+      .catch((error: Error) => {
+        setState((prev) => ({ ...prev, loading: false, error: error.message }));
+      });
+  }, []);
+
   const { connected } = useSocket({
     onTicketNew: handleTicketNew,
     onTicketUpdated: upsertTicket,
     onHeartbeat: handleHeartbeat,
+    onSync: loadFullState,
   });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([fetchSites(), fetchTickets()])
-      .then(([sites, tickets]) => {
-        if (cancelled) return;
-        setState((prev) => ({ ...prev, sites, tickets, loading: false }));
-      })
-      .catch((error: Error) => {
-        if (cancelled) return;
-        setState((prev) => ({ ...prev, loading: false, error: error.message }));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const stats = useMemo(
     () => computeStats(state.tickets, state.sites),
