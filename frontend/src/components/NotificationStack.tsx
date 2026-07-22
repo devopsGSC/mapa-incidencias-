@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TicketNotification } from "../hooks/useDashboardData";
 import { DepartmentIcon } from "../lib/departmentIcons";
-import { PRIORITY_LABELS } from "../lib/labels";
+import { PRIORITY_LABELS, STATUS_CHART_COLORS, STATUS_LABELS } from "../lib/labels";
 import { Site, TicketPriority } from "../types";
 
 interface NotificationStackProps {
@@ -20,7 +20,7 @@ const PRIORITY_BORDER: Record<TicketPriority, string> = {
   low: "var(--muted-2)",
 };
 
-/** Banner "ticket entrante": aparece al recibir ticket:new y se auto-oculta a los pocos segundos. */
+/** Banner "ticket entrante"/"cambio de estado": aparece con ticket:new o ticket:status_changed y se auto-oculta a los pocos segundos. */
 export function NotificationStack({ notifications, sites, onDismiss }: NotificationStackProps) {
   const siteNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -51,7 +51,7 @@ interface ToastProps {
 }
 
 function Toast({ notification, siteName, onDismiss }: ToastProps) {
-  const { ticket } = notification;
+  const { ticket, kind, previousStatus } = notification;
   const [visible, setVisible] = useState(false);
   const removeTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -78,19 +78,26 @@ function Toast({ notification, siteName, onDismiss }: ToastProps) {
     removeTimer.current = setTimeout(onDismiss, EXIT_DURATION_MS);
   };
 
+  const isStatusChange = kind === "status_changed";
+  const borderColor = isStatusChange ? STATUS_CHART_COLORS[ticket.status] : PRIORITY_BORDER[ticket.priority];
+  const label = isStatusChange ? `Cambio de estado · ${ticket.id}` : `Nuevo ticket · ${ticket.id}`;
+  const metaLine = isStatusChange
+    ? `${siteName} · ${previousStatus ? `${STATUS_LABELS[previousStatus]} → ` : ""}${STATUS_LABELS[ticket.status]}`
+    : `${siteName} · ${PRIORITY_LABELS[ticket.priority]}`;
+
   return (
     <div
       className={`glass-panel pointer-events-auto flex items-start gap-4 border-l-[5px] px-6 py-5 shadow-2xl transition-all duration-300 ease-out ${
         visible ? "translate-x-0 opacity-100" : "translate-x-16 opacity-0"
       }`}
-      style={{ borderLeftColor: PRIORITY_BORDER[ticket.priority] }}
+      style={{ borderLeftColor: borderColor }}
     >
       <div className="mt-0.5 flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
         <DepartmentIcon department={ticket.department} size={28} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="mono-label text-sm text-[color:var(--cyan)]">
-          Nuevo ticket · {ticket.id}
+        <p className="mono-label text-sm" style={{ color: isStatusChange ? borderColor : "var(--cyan)" }}>
+          {label}
         </p>
         {ticket.osTicketUrl ? (
           <a
@@ -107,9 +114,7 @@ function Toast({ notification, siteName, onDismiss }: ToastProps) {
             {ticket.subject}
           </p>
         )}
-        <p className="mono-label mt-1.5 text-sm text-[color:var(--muted)]">
-          {siteName} · {PRIORITY_LABELS[ticket.priority]}
-        </p>
+        <p className="mono-label mt-1.5 text-sm text-[color:var(--muted)]">{metaLine}</p>
       </div>
       <button
         type="button"

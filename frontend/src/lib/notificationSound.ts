@@ -1,5 +1,3 @@
-import { TicketPriority } from "../types";
-
 const MUTE_STORAGE_KEY = "ticketSoundMuted";
 
 function readStoredMute(): boolean {
@@ -57,19 +55,23 @@ export function primeAudio() {
   getContext()?.resume().catch(() => {});
 }
 
-/** Campanada corta de dos tonos: más aguda y un pelo más fuerte para prioridades urgentes. */
-export function playTicketChime(priority: TicketPriority) {
+// Mismo chime para todos los casos (ticket nuevo, cambio de estado, cualquier
+// prioridad) — a este volumen de tickets, todo lo que suena merece la misma
+// atención; variar el tono/volumen por prioridad terminaba restándole peso
+// a avisos que también importan.
+const CHIME_FREQS = [880, 1108.73];
+const CHIME_PEAK_GAIN = 0.22;
+
+/** Campanada corta de dos tonos, igual para cualquier notificación de ticket. */
+export function playTicketChime() {
   if (muted) return;
 
   const ctx = getContext();
   if (!ctx || ctx.state === "suspended") return;
 
-  const isUrgent = priority === "urgente" || priority === "high";
-  const freqs = isUrgent ? [880, 1108.73] : [660, 880];
-  const peakGain = isUrgent ? 0.22 : 0.14;
   const now = ctx.currentTime;
 
-  freqs.forEach((freq, index) => {
+  CHIME_FREQS.forEach((freq, index) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
@@ -77,7 +79,7 @@ export function playTicketChime(priority: TicketPriority) {
 
     const start = now + index * 0.12;
     gain.gain.setValueAtTime(0, start);
-    gain.gain.linearRampToValueAtTime(peakGain, start + 0.02);
+    gain.gain.linearRampToValueAtTime(CHIME_PEAK_GAIN, start + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
 
     osc.connect(gain).connect(ctx.destination);

@@ -1,9 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { fetchSites, fetchTickets } from "../api/client";
 import { computeStats } from "../lib/computeStats";
 import { playTicketChime } from "../lib/notificationSound";
-import { Site, Ticket } from "../types";
-import { useSocket } from "./useSocket";
+import { Site, Ticket, TicketStatus } from "../types";
+import { StatusChangedPayload, useSocket } from "./useSocket";
 
 interface DashboardState {
   sites: Site[];
@@ -17,7 +17,10 @@ interface DashboardState {
 
 export interface TicketNotification {
   id: string;
+  kind: "new" | "status_changed";
   ticket: Ticket;
+  /** Solo para kind === "status_changed" — el estado que tenía antes del cambio. */
+  previousStatus?: TicketStatus;
 }
 
 const MAX_VISIBLE_NOTIFICATIONS = 4;
@@ -34,6 +37,13 @@ export function useDashboardData() {
   });
   const [notifications, setNotifications] = useState<TicketNotification[]>([]);
 
+  // Necesario para leer el estado más reciente desde handlers registrados
+  // una sola vez en el socket (useSocket los toma con deps [] y los conserva
+  // vía handlersRef) — sin esto, handleStatusChanged vería siempre los
+  // tickets de la primera carga.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const upsertTicket = useCallback((incoming: Ticket) => {
     setState((prev) => {
       const exists = prev.tickets.some((t) => t.id === incoming.id);
@@ -47,14 +57,45 @@ export function useDashboardData() {
   const handleTicketNew = useCallback(
     (incoming: Ticket) => {
       upsertTicket(incoming);
-      playTicketChime(incoming.priority);
+      playTicketChime();
       setNotifications((prev) => {
-        const entry: TicketNotification = { id: `${incoming.id}-${Date.now()}`, ticket: incoming };
+        const entry: TicketNotification = { id: `${incoming.id}-${Date.now()}`, kind: "new", ticket: incoming };
         return [...prev, entry].slice(-MAX_VISIBLE_NOTIFICATIONS);
       });
     },
     [upsertTicket]
   );
+
+  /**
+   * Ticket que cambió de estado, según el log de eventos real de osTicket
+   * (ver ticketEventsPoller.ts en el backend) — no el poll normal de
+   * tickets. Con el volumen actual, un cierre/resolución se perdía entre
+   * ticket:updated sin que nadie lo notara; esto le da su propia
+   * notificación, con el mismo sonido que un ticket nuevo.
+   */
+  const handleStatusChanged = useCallback(({ ticketId, status }: StatusChangedPayload) => {
+    const existing = stateRef.current.tickets.find((t) => t.id === ticketId);
+    // Sin el ticket en memoria todavía, o la sync normal ya se adelantó y
+    // dejó el mismo estado: no hay nada nuevo que avisar.
+    if (!existing || existing.status === status) return;
+
+    const updatedTicket: Ticket = { ...existing, status };
+    playTicketChime();
+    setState((prev) => ({
+      ...prev,
+      tickets: prev.tickets.map((t) => (t.id === ticketId ? updatedTicket : t)),
+      lastEventAt: new Date(),
+    }));
+    setNotifications((prev) => {
+      const entry: TicketNotification = {
+        id: `${ticketId}-status-${Date.now()}`,
+        kind: "status_changed",
+        ticket: updatedTicket,
+        previousStatus: existing.status,
+      };
+      return [...prev, entry].slice(-MAX_VISIBLE_NOTIFICATIONS);
+    });
+  }, []);
 
   const dismissNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -85,6 +126,7 @@ export function useDashboardData() {
     onTicketNew: handleTicketNew,
     onTicketUpdated: upsertTicket,
     onHeartbeat: handleHeartbeat,
+    onStatusChanged: handleStatusChanged,
     onSync: loadFullState,
   });
 

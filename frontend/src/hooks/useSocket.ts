@@ -1,17 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { API_BASE_URL } from "../api/client";
-import { Ticket } from "../types";
+import { Ticket, TicketStatus } from "../types";
 
 interface HeartbeatPayload {
   at: string;
   checked: number;
 }
 
+export interface StatusChangedPayload {
+  ticketId: string;
+  status: TicketStatus;
+}
+
 interface UseSocketOptions {
   onTicketNew: (ticket: Ticket) => void;
   onTicketUpdated: (ticket: Ticket) => void;
   onHeartbeat: (payload: HeartbeatPayload) => void;
+  /** Ticket que cambió de estado (abierto/resuelto/cerrado) — viene del log de eventos real de osTicket, no del poll normal de tickets (ver ticketEventsPoller.ts en el backend). */
+  onStatusChanged: (payload: StatusChangedPayload) => void;
   /**
    * Se llama al conectar por primera vez Y en cada reconexión (automática o
    * forzada por el watchdog). Quien lo use debe volver a pedir el estado
@@ -31,10 +38,16 @@ interface UseSocketOptions {
 // absolutamente nada (ni heartbeat ni ticket), fuerza una reconexión a mano.
 const WATCHDOG_TIMEOUT_MS = 45000; // > 2x el intervalo real del heartbeat del backend (20s)
 
-export function useSocket({ onTicketNew, onTicketUpdated, onHeartbeat, onSync }: UseSocketOptions) {
+export function useSocket({
+  onTicketNew,
+  onTicketUpdated,
+  onHeartbeat,
+  onStatusChanged,
+  onSync,
+}: UseSocketOptions) {
   const [connected, setConnected] = useState(false);
-  const handlersRef = useRef({ onTicketNew, onTicketUpdated, onHeartbeat, onSync });
-  handlersRef.current = { onTicketNew, onTicketUpdated, onHeartbeat, onSync };
+  const handlersRef = useRef({ onTicketNew, onTicketUpdated, onHeartbeat, onStatusChanged, onSync });
+  handlersRef.current = { onTicketNew, onTicketUpdated, onHeartbeat, onStatusChanged, onSync };
 
   useEffect(() => {
     const socket: Socket = io(API_BASE_URL, {
@@ -75,6 +88,10 @@ export function useSocket({ onTicketNew, onTicketUpdated, onHeartbeat, onSync }:
     socket.on("sync:heartbeat", (payload: HeartbeatPayload) => {
       armWatchdog();
       handlersRef.current.onHeartbeat(payload);
+    });
+    socket.on("ticket:status_changed", (payload: StatusChangedPayload) => {
+      armWatchdog();
+      handlersRef.current.onStatusChanged(payload);
     });
 
     return () => {

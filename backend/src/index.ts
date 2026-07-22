@@ -10,6 +10,7 @@ import { authRouter } from "./routes/auth";
 import { sitesRouter } from "./routes/sites";
 import { ticketsRouter } from "./routes/tickets";
 import { startLiveSimulator } from "./sockets/liveSimulator";
+import { startTicketEventsPoller } from "./sockets/ticketEventsPoller";
 
 const PORT = Number(process.env.PORT ?? 4000);
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN ?? "http://localhost:5173").split(",");
@@ -75,6 +76,7 @@ io.on("connection", (socket) => {
 });
 
 startLiveSimulator(io);
+startTicketEventsPoller(io);
 
 httpServer.listen(PORT, () => {
   console.log(`API + socket.io escuchando en http://localhost:${PORT}`);

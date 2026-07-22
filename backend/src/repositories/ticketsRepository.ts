@@ -424,6 +424,9 @@ class MySqlTicketsRepository implements TicketsRepository {
 export const ticketsRepository: TicketsRepository = new MySqlTicketsRepository();
 
 // Reutilizados por el poller de socket.io (sockets/liveSimulator.ts) para no
-// duplicar la lógica de mapeo DB -> Ticket.
-export { TICKETS_SELECT, mapRow as mapTicketRow, loadMapRowContext, mysqlDatetimeToIso };
+// duplicar la lógica de mapeo DB -> Ticket. STATUS_NAME_TO_APP también la usa
+// sockets/ticketEventsPoller.ts, para traducir por PALABRA (nunca por ID) el
+// estado que loguea ost_thread_event — misma regla de oro que en el resto
+// del archivo, una sola fuente de verdad para esa traducción.
+export { TICKETS_SELECT, mapRow as mapTicketRow, loadMapRowContext, mysqlDatetimeToIso, STATUS_NAME_TO_APP };
 export type { TicketRow, MapRowContext };
