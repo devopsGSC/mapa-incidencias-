@@ -1,11 +1,11 @@
-import { IconKey, IconTrash, IconUserPlus } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconUserPlus } from "@tabler/icons-react";
 import { FormEvent, useEffect, useState } from "react";
 import {
   createUser,
   deleteUser,
   fetchUsers,
-  resetUserPassword,
   setUserRole,
+  updateUserProfile,
 } from "../api/adminClient";
 import { UnauthorizedError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -24,9 +24,10 @@ interface CreateFormState {
   role: Role;
 }
 
-interface ResetPasswordState {
+interface EditFormState {
+  originalUsername: string;
   username: string;
-  password: string;
+  email: string;
 }
 
 export function AdminUsersSection() {
@@ -37,8 +38,9 @@ export function AdminUsersSection() {
   const [createForm, setCreateForm] = useState<CreateFormState | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [resetForm, setResetForm] = useState<ResetPasswordState | null>(null);
-  const [resetError, setResetError] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<EditFormState | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const load = async () => {
     try {
@@ -104,23 +106,32 @@ export function AdminUsersSection() {
     }
   };
 
-  const handleResetSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!resetForm) return;
-    if (resetForm.password.length < 8) {
-      setResetError("La contraseña debe tener al menos 8 caracteres.");
-      return;
-    }
+  const openEditForm = (u: AdminUserSummary) => {
+    setEditError(null);
+    setEditForm({ originalUsername: u.username, username: u.username, email: u.email });
+  };
 
+  const handleEditSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!editForm) return;
+
+    setEditSaving(true);
+    setEditError(null);
     try {
-      await resetUserPassword(resetForm.username, resetForm.password);
-      setResetForm(null);
+      await updateUserProfile(editForm.originalUsername, {
+        username: editForm.username,
+        email: editForm.email,
+      });
+      setEditForm(null);
+      await load();
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         clearSession();
         return;
       }
-      setResetError(err instanceof Error ? err.message : "No se pudo resetear la contraseña.");
+      setEditError(err instanceof Error ? err.message : "No se pudo guardar los cambios.");
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -222,15 +233,12 @@ export function AdminUsersSection() {
                     <td className="px-4 py-2.5 text-right">
                       <button
                         type="button"
-                        onClick={() => {
-                          setResetError(null);
-                          setResetForm({ username: u.username, password: "" });
-                        }}
-                        aria-label={`Resetear clave de ${u.username}`}
-                        title="Resetear clave"
+                        onClick={() => openEditForm(u)}
+                        aria-label={`Editar ${u.username}`}
+                        title="Editar usuario"
                         className="mr-2 rounded p-1 text-[color:var(--text-secondary)] transition-colors hover:text-[color:var(--text)]"
                       >
-                        <IconKey size={15} stroke={2} />
+                        <IconEdit size={15} stroke={2} />
                       </button>
                       <button
                         type="button"
@@ -331,40 +339,52 @@ export function AdminUsersSection() {
         </div>
       )}
 
-      {resetForm && (
+      {editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <form onSubmit={handleResetSubmit} className="glass-panel w-full max-w-sm space-y-4 p-6">
+          <form onSubmit={handleEditSubmit} className="glass-panel w-full max-w-sm space-y-4 p-6">
             <h3 className="font-display text-base font-semibold text-[color:var(--text)]">
-              Resetear contraseña de {resetForm.username}
+              Editar {editForm.originalUsername}
             </h3>
 
             <label className="block text-sm text-[color:var(--text-secondary)]">
-              Contraseña nueva
-              <PasswordInput
-                value={resetForm.password}
-                onChange={(e) => setResetForm({ ...resetForm, password: e.target.value })}
+              Usuario
+              <input
+                type="text"
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
                 required
                 autoFocus
-                minLength={8}
-                className="rounded-md border border-[color:var(--glass-border)] bg-black/20 px-3 py-2 text-[color:var(--text)] outline-none focus:border-[color:var(--cyan)]"
+                className="mt-1 w-full rounded-md border border-[color:var(--glass-border)] bg-black/20 px-3 py-2 text-[color:var(--text)] outline-none focus:border-[color:var(--cyan)]"
               />
             </label>
 
-            {resetError && <p className="text-sm text-[#FF718A]">{resetError}</p>}
+            <label className="block text-sm text-[color:var(--text-secondary)]">
+              Email
+              <input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                required
+                className="mt-1 w-full rounded-md border border-[color:var(--glass-border)] bg-black/20 px-3 py-2 text-[color:var(--text)] outline-none focus:border-[color:var(--cyan)]"
+              />
+            </label>
+
+            {editError && <p className="text-sm text-[#FF718A]">{editError}</p>}
 
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setResetForm(null)}
+                onClick={() => setEditForm(null)}
                 className="rounded-md bg-white/5 px-3 py-1.5 text-sm text-[color:var(--text)] hover:bg-white/10"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-[color:var(--text)] hover:bg-white/15"
+                disabled={editSaving}
+                className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-[color:var(--text)] hover:bg-white/15 disabled:opacity-50"
               >
-                Guardar
+                {editSaving ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </form>

@@ -50,10 +50,18 @@ export function setUserRole(username: string, role: Role): Promise<AdminUserSumm
   });
 }
 
-export function resetUserPassword(username: string, password: string): Promise<{ ok: true }> {
-  return adminRequest(`/users/${encodeURIComponent(username)}/reset-password`, {
-    method: "POST",
-    body: JSON.stringify({ password }),
+export interface UpdateUserProfilePayload {
+  username?: string;
+  email?: string;
+}
+
+export function updateUserProfile(
+  username: string,
+  payload: UpdateUserProfilePayload
+): Promise<AdminUserSummary> {
+  return adminRequest<AdminUserSummary>(`/users/${encodeURIComponent(username)}/profile`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
 }
 

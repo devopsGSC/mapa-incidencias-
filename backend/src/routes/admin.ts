@@ -159,7 +159,11 @@ adminRouter.post("/users", async (req, res, next) => {
       role: role as Role,
     });
     if (!result.ok) {
-      res.status(409).json({ error: `"${username}" ya existe.` });
+      const message =
+        result.error === "duplicate-email"
+          ? `Ya existe otra cuenta con el email "${email}". Un mismo email no puede pertenecer a dos cuentas: "¿Olvidaste tu contraseña?" resetearía la que no esperás.`
+          : `"${username}" ya existe.`;
+      res.status(409).json({ error: message });
       return;
     }
     res.status(201).json(result.user);
@@ -195,24 +199,40 @@ adminRouter.patch("/users/:username/role", (req, res) => {
   res.json(updated);
 });
 
-adminRouter.post("/users/:username/reset-password", async (req, res, next) => {
-  try {
-    const { password } = (req.body ?? {}) as { password?: unknown };
-    if (typeof password !== "string" || password.length < 8) {
-      res.status(400).json({ error: "password debe tener al menos 8 caracteres." });
+adminRouter.patch("/users/:username/profile", (req, res) => {
+  const { username: newUsername, email } = (req.body ?? {}) as { username?: unknown; email?: unknown };
+
+  const updates: { username?: string; email?: string } = {};
+  if (newUsername !== undefined) {
+    if (typeof newUsername !== "string" || newUsername.trim().length === 0) {
+      res.status(400).json({ error: "username no puede quedar vacío." });
       return;
     }
+    updates.username = newUsername.trim();
+  }
+  if (email !== undefined) {
+    if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
+      res.status(400).json({ error: "email debe ser válido." });
+      return;
+    }
+    updates.email = email.trim();
+  }
 
-    const username = decodeURIComponent(req.params.username);
-    const ok = await usersRepository.resetPassword(username, password);
-    if (!ok) {
+  const currentUsername = decodeURIComponent(req.params.username);
+  const result = usersRepository.updateProfile(currentUsername, updates);
+  if (!result.ok) {
+    if (result.error === "not-found") {
       res.status(404).json({ error: "Usuario no encontrado." });
       return;
     }
-    res.json({ ok: true });
-  } catch (error) {
-    next(error);
+    const message =
+      result.error === "duplicate-email"
+        ? `Ya existe otra cuenta con el email "${email}".`
+        : `El usuario "${newUsername}" ya existe.`;
+    res.status(409).json({ error: message });
+    return;
   }
+  res.json(result.user);
 });
 
 adminRouter.delete("/users/:username", (req, res) => {

@@ -65,9 +65,15 @@ function toPublicUser(stored: StoredUser): PublicUser {
   return { username: stored.username, email: stored.email, role: stored.role };
 }
 
-export type CreateUserResult = { ok: true; user: PublicUser } | { ok: false; error: "duplicate" };
+export type CreateUserResult =
+  | { ok: true; user: PublicUser }
+  | { ok: false; error: "duplicate-username" | "duplicate-email" };
 
 export type ResetPasswordWithTokenResult = "ok" | "invalid" | "expired";
+
+export type UpdateProfileResult =
+  | { ok: true; user: PublicUser }
+  | { ok: false; error: "not-found" | "duplicate-username" | "duplicate-email" };
 
 export interface UsersRepository {
   findAll(): PublicUser[];
@@ -75,7 +81,7 @@ export interface UsersRepository {
   findByEmail(email: string): StoredUser | undefined;
   create(input: { username: string; email: string; password: string; role: Role }): Promise<CreateUserResult>;
   setRole(username: string, role: Role): PublicUser | undefined;
-  resetPassword(username: string, newPassword: string): Promise<boolean>;
+  updateProfile(currentUsername: string, updates: { username?: string; email?: string }): UpdateProfileResult;
   setResetToken(username: string, token: string, expiresAt: number): void;
   resetPasswordWithToken(token: string, newPassword: string): Promise<ResetPasswordWithTokenResult>;
   remove(username: string): boolean;
@@ -110,9 +116,17 @@ class JsonUsersRepository implements UsersRepository {
     password: string;
     role: Role;
   }): Promise<CreateUserResult> {
-    const target = normalizeUsername(input.username);
-    if (this.users.some((u) => normalizeUsername(u.username) === target)) {
-      return { ok: false, error: "duplicate" };
+    const targetUsername = normalizeUsername(input.username);
+    if (this.users.some((u) => normalizeUsername(u.username) === targetUsername)) {
+      return { ok: false, error: "duplicate-username" };
+    }
+    // Un email nunca puede pertenecer a dos cuentas: findByEmail (usado por
+    // forgot-password) devuelve la PRIMERA coincidencia, así que un email
+    // compartido haría que restablecer la contraseña de una cuenta en
+    // realidad resetee la otra sin que quien lo pide se entere.
+    const targetEmail = normalizeEmail(input.email);
+    if (this.users.some((u) => normalizeEmail(u.email) === targetEmail)) {
+      return { ok: false, error: "duplicate-email" };
     }
     const passwordHash = await bcrypt.hash(input.password, PASSWORD_HASH_COST);
     const stored: StoredUser = {
@@ -136,12 +150,25 @@ class JsonUsersRepository implements UsersRepository {
     return toPublicUser(user);
   }
 
-  async resetPassword(username: string, newPassword: string): Promise<boolean> {
-    const user = this.findByUsername(username);
-    if (!user) return false;
-    user.passwordHash = await bcrypt.hash(newPassword, PASSWORD_HASH_COST);
+  updateProfile(currentUsername: string, updates: { username?: string; email?: string }): UpdateProfileResult {
+    const user = this.findByUsername(currentUsername);
+    if (!user) return { ok: false, error: "not-found" };
+
+    if (updates.username !== undefined) {
+      const target = normalizeUsername(updates.username);
+      const collision = this.users.some((u) => u !== user && normalizeUsername(u.username) === target);
+      if (collision) return { ok: false, error: "duplicate-username" };
+    }
+    if (updates.email !== undefined) {
+      const target = normalizeEmail(updates.email);
+      const collision = this.users.some((u) => u !== user && normalizeEmail(u.email) === target);
+      if (collision) return { ok: false, error: "duplicate-email" };
+    }
+
+    if (updates.username !== undefined) user.username = updates.username.trim();
+    if (updates.email !== undefined) user.email = updates.email.trim();
     writeUsersFile(this.users);
-    return true;
+    return { ok: true, user: toPublicUser(user) };
   }
 
   setResetToken(username: string, token: string, expiresAt: number): void {

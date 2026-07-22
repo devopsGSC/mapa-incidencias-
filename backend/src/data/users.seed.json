@@ -2,7 +2,7 @@
   "users": [
     {
       "username": "admin",
-      "email": "admin@example.com",
+      "email": "gcslatamproyectos@gmail.com",
       "passwordHash": "$2b$12$gZdDWlvUDPpvpyxSEaI2q.xEYQh7LtyMw6RCSqX1QpZ52fGCshjAu",
       "role": "admin",
       "resetToken": null,
