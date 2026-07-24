@@ -12,6 +12,8 @@ export interface AdminUserSummary {
   username: string;
   email: string;
   role: Role;
+  /** Array vacío = sin restricción, ve todos los departamentos. */
+  allowedDepartments: string[];
 }
 
 export type TicketPriority = "low" | "normal" | "high" | "urgente";
@@ -29,6 +31,8 @@ export interface Ticket {
   priority: TicketPriority;
   department: string;
   helpTopic: string;
+  /** Equipo asignado (ost_team) — cruza departamentos, no es un hijo de department. "Sin equipo" si no tiene. */
+  team: string;
   siteId: string;
   createdAt: string;
   updatedAt: string;

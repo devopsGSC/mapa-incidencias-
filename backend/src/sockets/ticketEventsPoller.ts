@@ -9,6 +9,7 @@ interface ThreadEventRow {
   id: number;
   ticketId: number;
   data: string | null;
+  departmentName: string | null;
 }
 
 export interface TicketStatusChangedPayload {
@@ -45,9 +46,11 @@ export function startTicketEventsPoller(io: Server): void {
   const tick = async () => {
     try {
       const rows = await readOnlyQuery<ThreadEventRow>(
-        `SELECT te.id AS id, th.object_id AS ticketId, te.data AS data
+        `SELECT te.id AS id, th.object_id AS ticketId, te.data AS data, d.name AS departmentName
          FROM ost_thread_event te
          JOIN ost_thread th ON th.id = te.thread_id AND th.object_type = 'T'
+         LEFT JOIN ost_ticket t ON t.ticket_id = th.object_id
+         LEFT JOIN ost_department d ON d.id = t.dept_id
          WHERE te.id > ? AND JSON_EXTRACT(te.data, '$.status') IS NOT NULL
          ORDER BY te.id ASC`,
         [lastSeenId]
@@ -64,7 +67,9 @@ export function startTicketEventsPoller(io: Server): void {
           ticketId: `TCK-${row.ticketId}`,
           status,
         };
-        io.emit("ticket:status_changed", payload);
+        // El departamento solo decide la room de destino (mismo esquema que
+        // liveSimulator.ts) — el payload que recibe el frontend no cambia.
+        io.to(`department:${row.departmentName}`).to("all-departments").emit("ticket:status_changed", payload);
       }
     } catch (error) {
       console.error("[ticketEventsPoller] error consultando eventos:", (error as Error).message);

@@ -113,6 +113,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
               <th className="px-3 py-2 font-medium">Sitio</th>
               <th className="px-3 py-2 font-medium">Depto.</th>
               <th className="px-3 py-2 font-medium">Tema</th>
+              <th className="px-3 py-2 font-medium">Equipo</th>
               <th className="min-w-[110px] px-3 py-2 font-medium">Estado</th>
               <th className="min-w-[110px] px-3 py-2 font-medium">Prioridad</th>
               <th className="px-3 py-2 font-medium">Solicitante</th>
@@ -156,6 +157,9 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
                 <td className="max-w-[160px] truncate px-3 py-2 text-[color:var(--muted)]">
                   {ticket.helpTopic}
                 </td>
+                <td className="max-w-[160px] truncate px-3 py-2 text-[color:var(--muted)]">
+                  {ticket.team}
+                </td>
                 <td className="min-w-[110px] px-3 py-2">
                   <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                     <span
@@ -187,7 +191,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="px-3 py-8 text-center text-[color:var(--muted)]"
                 >
                   No hay tickets que coincidan con los filtros.

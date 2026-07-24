@@ -32,11 +32,18 @@ export function fetchUsers(): Promise<AdminUserSummary[]> {
   return adminRequest<AdminUserSummary[]>("/users");
 }
 
+/** Fuente en vivo (ost_department) para poblar el selector de departamentos del panel — nunca hardcodear la lista. */
+export function fetchDepartments(): Promise<string[]> {
+  return adminRequest<string[]>("/departments");
+}
+
 export interface CreateUserPayload {
   username: string;
   email: string;
   password: string;
   role: Role;
+  /** Vacío/omitido = sin restricción, ve todos los departamentos. */
+  allowedDepartments?: string[];
 }
 
 export function createUser(payload: CreateUserPayload): Promise<AdminUserSummary> {
@@ -53,6 +60,7 @@ export function setUserRole(username: string, role: Role): Promise<AdminUserSumm
 export interface UpdateUserProfilePayload {
   username?: string;
   email?: string;
+  allowedDepartments?: string[];
 }
 
 export function updateUserProfile(

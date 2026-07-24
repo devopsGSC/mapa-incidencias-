@@ -199,7 +199,7 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
                 </p>
               </div>
               <p className="mono-label mt-1 truncate text-[9px] text-[color:var(--muted-2)]">
-                Tema: {ticket.helpTopic}
+                Tema: {ticket.helpTopic} · Equipo: {ticket.team}
               </p>
             </div>
           ))

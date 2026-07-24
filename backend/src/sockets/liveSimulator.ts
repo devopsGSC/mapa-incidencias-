@@ -60,7 +60,13 @@ export function startLiveSimulator(io: Server): void {
         if (!ticket) continue; // Archivado/Borrado u otro estado excluido: no se emite
 
         const isNewTicket = row.created > currentWatermark;
-        io.emit(isNewTicket ? "ticket:new" : "ticket:updated", ticket);
+        // Nunca broadcast global: solo a quien tiene ese departamento
+        // permitido (room "department:<nombre>") y a quien no tiene
+        // restricción (room "all-departments") — ver el join de rooms en
+        // index.ts. .to().to() es unión de rooms, no intersección.
+        io.to(`department:${ticket.department}`)
+          .to("all-departments")
+          .emit(isNewTicket ? "ticket:new" : "ticket:updated", ticket);
       }
 
       watermark = nextWatermark;

@@ -27,6 +27,43 @@ async function loadRealSiteNames(): Promise<string[]> {
   return rows.map((row) => row.value);
 }
 
+/** Departamentos reales de osTicket — misma regla de oro que sitios: nunca hardcodear, siempre en vivo contra ost_department. */
+async function loadRealDepartmentNames(): Promise<string[]> {
+  const rows = await readOnlyQuery<{ name: string }>(`SELECT name FROM ost_department ORDER BY name`);
+  return rows.map((row) => row.name);
+}
+
+type ResolveAllowedDepartmentsResult =
+  | { ok: true; departments: string[] }
+  | { ok: false; error: string };
+
+/**
+ * Valida allowedDepartments contra la lista en vivo (nunca se confía en que
+ * el frontend ya filtró nombres válidos) y devuelve el nombre CANÓNICO tal
+ * como viene de ost_department, no el string crudo recibido — evita drift
+ * de mayúsculas/espacios entre lo guardado y lo que después compara el
+ * poller/consulta SQL.
+ */
+function resolveAllowedDepartments(raw: unknown, realNames: string[]): ResolveAllowedDepartmentsResult {
+  if (raw === undefined) return { ok: true, departments: [] };
+  if (!Array.isArray(raw) || !raw.every((v) => typeof v === "string")) {
+    return { ok: false, error: "allowedDepartments debe ser un array de strings." };
+  }
+
+  const departments: string[] = [];
+  for (const name of raw) {
+    const canonical = realNames.find((real) => normalizeName(real) === normalizeName(name));
+    if (!canonical) {
+      return {
+        ok: false,
+        error: `"${name}" no existe como departamento real en osTicket (ost_department).`,
+      };
+    }
+    if (!departments.includes(canonical)) departments.push(canonical);
+  }
+  return { ok: true, departments };
+}
+
 /** Sitios reales de osTicket que todavía no tienen una entrada en site-metadata.json. */
 adminRouter.get("/sites/unmapped", async (_req, res, next) => {
   try {
@@ -118,6 +155,15 @@ adminRouter.delete("/sites/:name", (req, res) => {
   res.json({ ok: true });
 });
 
+/** Fuente en vivo para poblar el selector de departamentos del panel (creación/edición de usuarios). */
+adminRouter.get("/departments", async (_req, res, next) => {
+  try {
+    res.json(await loadRealDepartmentNames());
+  } catch (error) {
+    next(error);
+  }
+});
+
 // --- Gestión de usuarios (admin-only) ---------------------------------
 
 adminRouter.get("/users", (_req, res) => {
@@ -128,11 +174,12 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 adminRouter.post("/users", async (req, res, next) => {
   try {
-    const { username, email, password, role } = (req.body ?? {}) as {
+    const { username, email, password, role, allowedDepartments } = (req.body ?? {}) as {
       username?: unknown;
       email?: unknown;
       password?: unknown;
       role?: unknown;
+      allowedDepartments?: unknown;
     };
 
     if (typeof username !== "string" || username.trim().length === 0) {
@@ -152,11 +199,19 @@ adminRouter.post("/users", async (req, res, next) => {
       return;
     }
 
+    const realDepartments = await loadRealDepartmentNames();
+    const resolvedDepartments = resolveAllowedDepartments(allowedDepartments, realDepartments);
+    if (!resolvedDepartments.ok) {
+      res.status(400).json({ error: resolvedDepartments.error });
+      return;
+    }
+
     const result = await usersRepository.create({
       username: username.trim(),
       email: email.trim(),
       password,
       role: role as Role,
+      allowedDepartments: resolvedDepartments.departments,
     });
     if (!result.ok) {
       const message =
@@ -199,40 +254,57 @@ adminRouter.patch("/users/:username/role", (req, res) => {
   res.json(updated);
 });
 
-adminRouter.patch("/users/:username/profile", (req, res) => {
-  const { username: newUsername, email } = (req.body ?? {}) as { username?: unknown; email?: unknown };
+adminRouter.patch("/users/:username/profile", async (req, res, next) => {
+  try {
+    const { username: newUsername, email, allowedDepartments } = (req.body ?? {}) as {
+      username?: unknown;
+      email?: unknown;
+      allowedDepartments?: unknown;
+    };
 
-  const updates: { username?: string; email?: string } = {};
-  if (newUsername !== undefined) {
-    if (typeof newUsername !== "string" || newUsername.trim().length === 0) {
-      res.status(400).json({ error: "username no puede quedar vacío." });
-      return;
+    const updates: { username?: string; email?: string; allowedDepartments?: string[] } = {};
+    if (newUsername !== undefined) {
+      if (typeof newUsername !== "string" || newUsername.trim().length === 0) {
+        res.status(400).json({ error: "username no puede quedar vacío." });
+        return;
+      }
+      updates.username = newUsername.trim();
     }
-    updates.username = newUsername.trim();
-  }
-  if (email !== undefined) {
-    if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
-      res.status(400).json({ error: "email debe ser válido." });
-      return;
+    if (email !== undefined) {
+      if (typeof email !== "string" || !EMAIL_PATTERN.test(email.trim())) {
+        res.status(400).json({ error: "email debe ser válido." });
+        return;
+      }
+      updates.email = email.trim();
     }
-    updates.email = email.trim();
-  }
+    if (allowedDepartments !== undefined) {
+      const realDepartments = await loadRealDepartmentNames();
+      const resolvedDepartments = resolveAllowedDepartments(allowedDepartments, realDepartments);
+      if (!resolvedDepartments.ok) {
+        res.status(400).json({ error: resolvedDepartments.error });
+        return;
+      }
+      updates.allowedDepartments = resolvedDepartments.departments;
+    }
 
-  const currentUsername = decodeURIComponent(req.params.username);
-  const result = usersRepository.updateProfile(currentUsername, updates);
-  if (!result.ok) {
-    if (result.error === "not-found") {
-      res.status(404).json({ error: "Usuario no encontrado." });
+    const currentUsername = decodeURIComponent(req.params.username);
+    const result = usersRepository.updateProfile(currentUsername, updates);
+    if (!result.ok) {
+      if (result.error === "not-found") {
+        res.status(404).json({ error: "Usuario no encontrado." });
+        return;
+      }
+      const message =
+        result.error === "duplicate-email"
+          ? `Ya existe otra cuenta con el email "${email}".`
+          : `El usuario "${newUsername}" ya existe.`;
+      res.status(409).json({ error: message });
       return;
     }
-    const message =
-      result.error === "duplicate-email"
-        ? `Ya existe otra cuenta con el email "${email}".`
-        : `El usuario "${newUsername}" ya existe.`;
-    res.status(409).json({ error: message });
-    return;
+    res.json(result.user);
+  } catch (error) {
+    next(error);
   }
-  res.json(result.user);
 });
 
 adminRouter.delete("/users/:username", (req, res) => {

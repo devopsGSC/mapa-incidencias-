@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../auth";
 import { ticketsRepository } from "../repositories/ticketsRepository";
+import { usersRepository } from "../repositories/usersRepository";
 import { TicketFilters, TicketPriority, TicketStatus } from "../types";
 
 export const ticketsRouter = Router();
@@ -12,9 +13,13 @@ const VALID_PRIORITIES: TicketPriority[] = ["low", "normal", "high", "urgente"];
 
 // IMPORTANTE: /stats debe declararse antes de cualquier ruta con parámetro
 // dinámico para que Express no intente resolver "stats" como un :id.
-ticketsRouter.get("/stats", async (_req, res, next) => {
+ticketsRouter.get("/stats", async (req, res, next) => {
   try {
-    res.json(await ticketsRepository.getStats());
+    // Se relee de usersRepository en cada request (nunca de un valor
+    // embebido en el JWT): un cambio de allowedDepartments hecho por el
+    // admin aplica en la próxima petición, sin esperar a que expire la sesión.
+    const allowedDepartments = usersRepository.getAllowedDepartments(req.user!.username);
+    res.json(await ticketsRepository.getStats(allowedDepartments));
   } catch (error) {
     next(error);
   }
@@ -41,7 +46,8 @@ ticketsRouter.get("/", async (req, res, next) => {
       filters.priority = priority as TicketPriority;
     }
 
-    res.json(await ticketsRepository.findAll(filters));
+    const allowedDepartments = usersRepository.getAllowedDepartments(req.user!.username);
+    res.json(await ticketsRepository.findAll(filters, allowedDepartments));
   } catch (error) {
     next(error);
   }

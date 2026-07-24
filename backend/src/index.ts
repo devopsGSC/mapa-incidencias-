@@ -9,6 +9,7 @@ import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/auth";
 import { sitesRouter } from "./routes/sites";
 import { ticketsRouter } from "./routes/tickets";
+import { usersRepository } from "./repositories/usersRepository";
 import { startLiveSimulator } from "./sockets/liveSimulator";
 import { startTicketEventsPoller } from "./sockets/ticketEventsPoller";
 
@@ -65,10 +66,25 @@ io.use((socket, next) => {
     next(new Error("unauthorized"));
     return;
   }
+  socket.data.session = session;
   next();
 });
 
+// Room "all-departments": todo cliente sin restricción configurada (el
+// caso de hoy para todo el mundo). Rooms "department:<nombre>": clientes
+// con allowedDepartments — ver liveSimulator.ts/ticketEventsPoller.ts, que
+// emiten a la unión de ambas en vez de hacer broadcast global.
 io.on("connection", (socket) => {
+  const { username } = socket.data.session as { username: string };
+  const allowedDepartments = usersRepository.getAllowedDepartments(username);
+  if (allowedDepartments) {
+    for (const department of allowedDepartments) {
+      socket.join(`department:${department}`);
+    }
+  } else {
+    socket.join("all-departments");
+  }
+
   console.log(`[socket] cliente conectado: ${socket.id}`);
   socket.on("disconnect", () => {
     console.log(`[socket] cliente desconectado: ${socket.id}`);

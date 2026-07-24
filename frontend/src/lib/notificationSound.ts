@@ -63,11 +63,26 @@ const CHIME_FREQS = [880, 1108.73];
 const CHIME_PEAK_GAIN = 0.22;
 
 /** Campanada corta de dos tonos, igual para cualquier notificación de ticket. */
-export function playTicketChime() {
+export async function playTicketChime() {
   if (muted) return;
 
   const ctx = getContext();
-  if (!ctx || ctx.state === "suspended") return;
+  if (!ctx) return;
+
+  if (ctx.state === "suspended") {
+    // El navegador vuelve a suspender el AudioContext solo por ahorro de
+    // energía tras un rato sin sonar (distinto del bloqueo inicial por
+    // autoplay, que ya se destrabó una vez con el primer gesto del
+    // usuario) — reanudarlo programáticamente no necesita un gesto nuevo.
+    // Sin este resume, en un dashboard que se mira pasivo (TV/kiosco) el
+    // sonido dejaba de sonar para siempre después del primer rato de
+    // silencio.
+    try {
+      await ctx.resume();
+    } catch {
+      return;
+    }
+  }
 
   const now = ctx.currentTime;
 

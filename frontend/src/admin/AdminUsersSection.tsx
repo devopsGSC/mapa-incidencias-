@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   createUser,
   deleteUser,
+  fetchDepartments,
   fetchUsers,
   setUserRole,
   updateUserProfile,
@@ -11,6 +12,7 @@ import { UnauthorizedError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { PasswordInput } from "../components/PasswordInput";
 import { AdminUserSummary, Role } from "../types";
+import { Badge } from "./Badge";
 
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrador",
@@ -22,17 +24,53 @@ interface CreateFormState {
   email: string;
   password: string;
   role: Role;
+  allowedDepartments: string[];
 }
 
 interface EditFormState {
   originalUsername: string;
   username: string;
   email: string;
+  allowedDepartments: string[];
+}
+
+interface DepartmentsCheckboxGroupProps {
+  departments: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}
+
+/** Ninguno marcado = sin restricción (ve todos los departamentos) — mismo criterio que el backend. */
+function DepartmentsCheckboxGroup({ departments, selected, onChange }: DepartmentsCheckboxGroupProps) {
+  const toggle = (name: string) => {
+    onChange(selected.includes(name) ? selected.filter((d) => d !== name) : [...selected, name]);
+  };
+
+  if (departments.length === 0) {
+    return <p className="mt-1 text-sm text-[color:var(--text-disabled)]">No hay departamentos disponibles.</p>;
+  }
+
+  return (
+    <div className="mt-1 max-h-40 space-y-1.5 overflow-y-auto rounded-md border border-[color:var(--glass-border)] bg-black/20 p-2.5">
+      {departments.map((name) => (
+        <label key={name} className="flex items-center gap-2 text-sm text-[color:var(--text)]">
+          <input
+            type="checkbox"
+            checked={selected.includes(name)}
+            onChange={() => toggle(name)}
+            className="h-3.5 w-3.5"
+          />
+          {name}
+        </label>
+      ))}
+    </div>
+  );
 }
 
 export function AdminUsersSection() {
   const { user: currentUser, clearSession } = useAuth();
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<CreateFormState | null>(null);
@@ -44,8 +82,9 @@ export function AdminUsersSection() {
 
   const load = async () => {
     try {
-      const list = await fetchUsers();
+      const [list, departmentNames] = await Promise.all([fetchUsers(), fetchDepartments()]);
       setUsers(list);
+      setDepartments(departmentNames);
       setError(null);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
@@ -65,7 +104,7 @@ export function AdminUsersSection() {
 
   const openCreateForm = () => {
     setCreateError(null);
-    setCreateForm({ username: "", email: "", password: "", role: "normal" });
+    setCreateForm({ username: "", email: "", password: "", role: "normal", allowedDepartments: [] });
   };
 
   const handleCreateSubmit = async (event: FormEvent) => {
@@ -108,7 +147,12 @@ export function AdminUsersSection() {
 
   const openEditForm = (u: AdminUserSummary) => {
     setEditError(null);
-    setEditForm({ originalUsername: u.username, username: u.username, email: u.email });
+    setEditForm({
+      originalUsername: u.username,
+      username: u.username,
+      email: u.email,
+      allowedDepartments: u.allowedDepartments,
+    });
   };
 
   const handleEditSubmit = async (event: FormEvent) => {
@@ -121,6 +165,7 @@ export function AdminUsersSection() {
       await updateUserProfile(editForm.originalUsername, {
         username: editForm.username,
         email: editForm.email,
+        allowedDepartments: editForm.allowedDepartments,
       });
       setEditForm(null);
       await load();
@@ -185,6 +230,7 @@ export function AdminUsersSection() {
                 <th className="px-4 py-3 font-medium">Usuario</th>
                 <th className="px-4 py-3 font-medium">Email</th>
                 <th className="px-4 py-3 font-medium">Rol</th>
+                <th className="px-4 py-3 font-medium">Departamentos</th>
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
@@ -229,6 +275,17 @@ export function AdminUsersSection() {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {u.allowedDepartments.length === 0 ? (
+                        <Badge>Todos</Badge>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {u.allowedDepartments.map((name) => (
+                            <Badge key={name}>{name}</Badge>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <button
@@ -317,6 +374,15 @@ export function AdminUsersSection() {
               </select>
             </label>
 
+            <div className="block text-sm text-[color:var(--text-secondary)]">
+              Departamentos permitidos (vacío = todos)
+              <DepartmentsCheckboxGroup
+                departments={departments}
+                selected={createForm.allowedDepartments}
+                onChange={(next) => setCreateForm({ ...createForm, allowedDepartments: next })}
+              />
+            </div>
+
             {createError && <p className="text-sm text-[#FF718A]">{createError}</p>}
 
             <div className="flex justify-end gap-2">
@@ -368,6 +434,15 @@ export function AdminUsersSection() {
                 className="mt-1 w-full rounded-md border border-[color:var(--glass-border)] bg-black/20 px-3 py-2 text-[color:var(--text)] outline-none focus:border-[color:var(--cyan)]"
               />
             </label>
+
+            <div className="block text-sm text-[color:var(--text-secondary)]">
+              Departamentos permitidos (vacío = todos)
+              <DepartmentsCheckboxGroup
+                departments={departments}
+                selected={editForm.allowedDepartments}
+                onChange={(next) => setEditForm({ ...editForm, allowedDepartments: next })}
+              />
+            </div>
 
             {editError && <p className="text-sm text-[#FF718A]">{editError}</p>}
 

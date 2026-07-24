@@ -56,7 +56,11 @@ function Toast({ notification, siteName, onDismiss }: ToastProps) {
   const removeTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    const enter = requestAnimationFrame(() => setVisible(true));
+    // setTimeout, no requestAnimationFrame: rAF queda completamente pausado
+    // mientras la pestaña está en segundo plano (dashboard con otra ventana
+    // encima, minimizado, etc.), así que el toast nunca llegaba a
+    // "visible" y se autodestruía sin haberse mostrado nunca.
+    const enterTimer = setTimeout(() => setVisible(true), 20);
     const exitTimer = setTimeout(() => close(), VISIBLE_DURATION_MS);
 
     function close() {
@@ -65,7 +69,7 @@ function Toast({ notification, siteName, onDismiss }: ToastProps) {
     }
 
     return () => {
-      cancelAnimationFrame(enter);
+      clearTimeout(enterTimer);
       clearTimeout(exitTimer);
       clearTimeout(removeTimer.current);
     };

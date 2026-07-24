@@ -160,6 +160,7 @@ interface TicketRow {
   priorityRaw: string | null;
   aduanaRaw: string | null;
   departmentName: string | null;
+  teamName: string | null;
   requesterName: string | null;
 }
 
@@ -227,6 +228,7 @@ function mapRow(row: TicketRow, ctx: MapRowContext): Ticket | null {
   const departmentRaw = (row.departmentName ?? "").trim();
   const department = DEPARTMENT_NAME_FIXES[departmentRaw] ?? (departmentRaw || "Sin departamento");
   const helpTopic = (row.topicId ? ctx.helpTopicNameById.get(row.topicId) : undefined) ?? "Sin tema";
+  const team = row.teamName?.trim() || "Sin equipo";
 
   return {
     id: `TCK-${row.ticketId}`,
@@ -235,6 +237,7 @@ function mapRow(row: TicketRow, ctx: MapRowContext): Ticket | null {
     priority,
     department,
     helpTopic,
+    team,
     siteId: resolveSiteId(row, ctx),
     createdAt: mysqlDatetimeToIso(row.created),
     updatedAt: mysqlDatetimeToIso(row.lastupdate ?? row.created),
@@ -260,10 +263,12 @@ const TICKETS_SELECT = `
     cd.priority  AS priorityRaw,
     cd.aduana    AS aduanaRaw,
     d.name       AS departmentName,
+    tm.name      AS teamName,
     u.name       AS requesterName
   FROM ost_ticket t
   LEFT JOIN ost_ticket__cdata cd ON cd.ticket_id = t.ticket_id
   LEFT JOIN ost_department d ON d.id = t.dept_id
+  LEFT JOIN ost_team tm ON tm.team_id = t.team_id
   LEFT JOIN ost_user u ON u.id = t.user_id
   WHERE 1=1
 `;
@@ -280,9 +285,23 @@ async function loadMapRowContext(): Promise<MapRowContext> {
   return { listItemNamesById, cctvSiteNameByTicketId, statusAppById, priorityAppById, helpTopicNameById };
 }
 
-async function fetchAllTickets(): Promise<Ticket[]> {
+/**
+ * allowedDepartments filtra en el ORIGEN (WHERE d.name IN (...)), no
+ * post-filtrado en JS — es el scoping de seguridad de allowedDepartments
+ * (ver usersRepository.getAllowedDepartments), separado de TicketFilters
+ * (los filtros que sí controla el cliente vía query string).
+ */
+async function fetchAllTickets(allowedDepartments?: string[] | null): Promise<Ticket[]> {
+  let sql = `${TICKETS_SELECT} `;
+  const params: unknown[] = [];
+  if (allowedDepartments && allowedDepartments.length > 0) {
+    sql += `AND d.name IN (${allowedDepartments.map(() => "?").join(",")}) `;
+    params.push(...allowedDepartments);
+  }
+  sql += `ORDER BY t.created DESC`;
+
   const [rows, ctx] = await Promise.all([
-    readOnlyQuery<TicketRow>(`${TICKETS_SELECT} ORDER BY t.created DESC`),
+    readOnlyQuery<TicketRow>(sql, params),
     loadMapRowContext(),
   ]);
 
@@ -325,18 +344,21 @@ function dateKey(isoDate: string): string {
  * consume el frontend — rutas de Express y frontend no cambiaron.
  */
 export interface TicketsRepository {
-  findAll(filters?: TicketFilters): Promise<Ticket[]>;
-  getStats(): Promise<TicketStats>;
+  findAll(filters?: TicketFilters, allowedDepartments?: string[] | null): Promise<Ticket[]>;
+  getStats(allowedDepartments?: string[] | null): Promise<TicketStats>;
 }
 
 class MySqlTicketsRepository implements TicketsRepository {
-  async findAll(filters: TicketFilters = {}): Promise<Ticket[]> {
-    const tickets = await fetchAllTickets();
+  async findAll(filters: TicketFilters = {}, allowedDepartments: string[] | null = null): Promise<Ticket[]> {
+    const tickets = await fetchAllTickets(allowedDepartments);
     return tickets.filter((ticket) => matchesFilters(ticket, filters));
   }
 
-  async getStats(): Promise<TicketStats> {
-    const [tickets, sites] = await Promise.all([fetchAllTickets(), Promise.resolve(sitesRepository.findAll())]);
+  async getStats(allowedDepartments: string[] | null = null): Promise<TicketStats> {
+    const [tickets, sites] = await Promise.all([
+      fetchAllTickets(allowedDepartments),
+      Promise.resolve(sitesRepository.findAll()),
+    ]);
 
     const byStatus = STATUSES.reduce((acc, status) => {
       acc[status] = 0;

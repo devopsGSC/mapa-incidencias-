@@ -22,6 +22,8 @@ interface StoredUser {
   role: Role;
   resetToken: string | null;
   resetTokenExpiry: number | null; // epoch ms
+  /** Array vacío = sin restricción (ve todos los departamentos, comportamiento actual). Ver getAllowedDepartments. */
+  allowedDepartments: string[];
 }
 
 interface UsersFile {
@@ -45,6 +47,7 @@ function readUsersFile(filePath: string): UsersFile {
     if (user.email === undefined) user.email = "";
     if (user.resetToken === undefined) user.resetToken = null;
     if (user.resetTokenExpiry === undefined) user.resetTokenExpiry = null;
+    if (user.allowedDepartments === undefined) user.allowedDepartments = [];
   }
   return parsed;
 }
@@ -62,7 +65,12 @@ function writeUsersFile(users: StoredUser[]): void {
 }
 
 function toPublicUser(stored: StoredUser): PublicUser {
-  return { username: stored.username, email: stored.email, role: stored.role };
+  return {
+    username: stored.username,
+    email: stored.email,
+    role: stored.role,
+    allowedDepartments: stored.allowedDepartments,
+  };
 }
 
 export type CreateUserResult =
@@ -79,13 +87,24 @@ export interface UsersRepository {
   findAll(): PublicUser[];
   findByUsername(username: string): StoredUser | undefined;
   findByEmail(email: string): StoredUser | undefined;
-  create(input: { username: string; email: string; password: string; role: Role }): Promise<CreateUserResult>;
+  create(input: {
+    username: string;
+    email: string;
+    password: string;
+    role: Role;
+    allowedDepartments?: string[];
+  }): Promise<CreateUserResult>;
   setRole(username: string, role: Role): PublicUser | undefined;
-  updateProfile(currentUsername: string, updates: { username?: string; email?: string }): UpdateProfileResult;
+  updateProfile(
+    currentUsername: string,
+    updates: { username?: string; email?: string; allowedDepartments?: string[] }
+  ): UpdateProfileResult;
   setResetToken(username: string, token: string, expiresAt: number): void;
   resetPasswordWithToken(token: string, newPassword: string): Promise<ResetPasswordWithTokenResult>;
   remove(username: string): boolean;
   countAdmins(): number;
+  /** null = sin restricción (ve todos los departamentos). Siempre lee el JSON en memoria más reciente, nunca un valor cacheado en el JWT — así un cambio de permisos por el admin aplica de inmediato, sin esperar a que expire la sesión. */
+  getAllowedDepartments(username: string): string[] | null;
 }
 
 class JsonUsersRepository implements UsersRepository {
@@ -115,6 +134,7 @@ class JsonUsersRepository implements UsersRepository {
     email: string;
     password: string;
     role: Role;
+    allowedDepartments?: string[];
   }): Promise<CreateUserResult> {
     const targetUsername = normalizeUsername(input.username);
     if (this.users.some((u) => normalizeUsername(u.username) === targetUsername)) {
@@ -136,6 +156,7 @@ class JsonUsersRepository implements UsersRepository {
       role: input.role,
       resetToken: null,
       resetTokenExpiry: null,
+      allowedDepartments: input.allowedDepartments ?? [],
     };
     this.users.push(stored);
     writeUsersFile(this.users);
@@ -150,7 +171,10 @@ class JsonUsersRepository implements UsersRepository {
     return toPublicUser(user);
   }
 
-  updateProfile(currentUsername: string, updates: { username?: string; email?: string }): UpdateProfileResult {
+  updateProfile(
+    currentUsername: string,
+    updates: { username?: string; email?: string; allowedDepartments?: string[] }
+  ): UpdateProfileResult {
     const user = this.findByUsername(currentUsername);
     if (!user) return { ok: false, error: "not-found" };
 
@@ -167,6 +191,7 @@ class JsonUsersRepository implements UsersRepository {
 
     if (updates.username !== undefined) user.username = updates.username.trim();
     if (updates.email !== undefined) user.email = updates.email.trim();
+    if (updates.allowedDepartments !== undefined) user.allowedDepartments = updates.allowedDepartments;
     writeUsersFile(this.users);
     return { ok: true, user: toPublicUser(user) };
   }
@@ -202,6 +227,12 @@ class JsonUsersRepository implements UsersRepository {
 
   countAdmins(): number {
     return this.users.filter((u) => u.role === "admin").length;
+  }
+
+  getAllowedDepartments(username: string): string[] | null {
+    const user = this.findByUsername(username);
+    const allowed = user?.allowedDepartments ?? [];
+    return allowed.length > 0 ? allowed : null;
   }
 }
 
