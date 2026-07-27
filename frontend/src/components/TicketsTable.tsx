@@ -24,6 +24,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
   const [siteId, setSiteId] = useState<string>("all");
   const [status, setStatus] = useState<TicketStatus | "all">("all");
   const [priority, setPriority] = useState<TicketPriority | "all">("all");
+  const [department, setDepartment] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const siteNameById = useMemo(() => {
@@ -32,15 +33,25 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
     return map;
   }, [sites]);
 
+  // En vivo a partir de los tickets ya cargados (mismo criterio del proyecto:
+  // nunca hardcodear la lista de departamentos) — así solo aparecen opciones
+  // que el usuario autenticado realmente puede ver.
+  const departments = useMemo(() => {
+    return Array.from(new Set(tickets.map((ticket) => ticket.department))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [tickets]);
+
   const filtered = useMemo(() => {
     return tickets
       .filter((ticket) => (siteId === "all" ? true : ticket.siteId === siteId))
       .filter((ticket) => (status === "all" ? true : ticket.status === status))
       .filter((ticket) => (priority === "all" ? true : ticket.priority === priority))
+      .filter((ticket) => (department === "all" ? true : ticket.department === department))
       .sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-  }, [tickets, siteId, status, priority]);
+  }, [tickets, siteId, status, priority, department]);
 
   const visible = filtered.slice(0, visibleCount);
 
@@ -95,6 +106,22 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
           {(Object.keys(PRIORITY_LABELS) as TicketPriority[]).map((value) => (
             <option key={value} value={value}>
               {PRIORITY_LABELS[value]}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={department}
+          onChange={(event) => {
+            setDepartment(event.target.value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          className={selectClasses}
+        >
+          <option value="all">Todos los departamentos</option>
+          {departments.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>

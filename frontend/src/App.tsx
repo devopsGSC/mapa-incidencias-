@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { MapHeroView } from "./components/MapHeroView";
@@ -6,7 +6,6 @@ import { MetricsView } from "./components/MetricsView";
 import { NotificationStack } from "./components/NotificationStack";
 import { TopBar, DashboardView } from "./components/TopBar";
 import { useDashboardData } from "./hooks/useDashboardData";
-import { computeSiteDepartmentBreakdown, computeSitePriorityPresence } from "./lib/siteDominance";
 import { Site } from "./types";
 
 export default function App() {
@@ -25,22 +24,6 @@ export default function App() {
   } = useDashboardData();
   const [view, setView] = useState<DashboardView>("map");
   const [selectedSite, setSelectedSite] = useState<Site | null>(null);
-
-  const siteStatsById = useMemo(() => {
-    const map = new Map<string, (typeof stats.bySite)[number]>();
-    stats.bySite.forEach((entry) => map.set(entry.siteId, entry));
-    return map;
-  }, [stats.bySite]);
-
-  const departmentBreakdownBySite = useMemo(
-    () => computeSiteDepartmentBreakdown(tickets),
-    [tickets]
-  );
-
-  const sitePriorityPresenceById = useMemo(
-    () => computeSitePriorityPresence(tickets),
-    [tickets]
-  );
 
   return (
     <div className="h-screen overflow-hidden bg-[color:var(--map-bg)]">
@@ -74,10 +57,6 @@ export default function App() {
         <MapHeroView
           sites={sites}
           tickets={tickets}
-          stats={stats}
-          siteStatsById={siteStatsById}
-          departmentBreakdownBySite={departmentBreakdownBySite}
-          sitePriorityPresenceById={sitePriorityPresenceById}
           selectedSite={selectedSite}
           onSelectSite={setSelectedSite}
         />
