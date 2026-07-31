@@ -27,6 +27,8 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
   const [status, setStatus] = useState<TicketStatus | "all">("all");
   const [priority, setPriority] = useState<TicketPriority | "all">("all");
   const [department, setDepartment] = useState<string>("all");
+  const [team, setTeam] = useState<string>("all");
+  const [agent, setAgent] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const siteNameById = useMemo(() => {
@@ -36,12 +38,20 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
   }, [sites]);
 
   // En vivo a partir de los tickets ya cargados (mismo criterio del proyecto:
-  // nunca hardcodear la lista de departamentos) — así solo aparecen opciones
-  // que el usuario autenticado realmente puede ver.
+  // nunca hardcodear estas listas) — así solo aparecen opciones que el
+  // usuario autenticado realmente puede ver.
   const departments = useMemo(() => {
     return Array.from(new Set(tickets.map((ticket) => ticket.department))).sort((a, b) =>
       a.localeCompare(b)
     );
+  }, [tickets]);
+
+  const teams = useMemo(() => {
+    return Array.from(new Set(tickets.map((ticket) => ticket.team))).sort((a, b) => a.localeCompare(b));
+  }, [tickets]);
+
+  const agents = useMemo(() => {
+    return Array.from(new Set(tickets.map((ticket) => ticket.agent))).sort((a, b) => a.localeCompare(b));
   }, [tickets]);
 
   const filtered = useMemo(() => {
@@ -50,10 +60,12 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
       .filter((ticket) => (status === "all" ? true : ticket.status === status))
       .filter((ticket) => (priority === "all" ? true : ticket.priority === priority))
       .filter((ticket) => (department === "all" ? true : ticket.department === department))
+      .filter((ticket) => (team === "all" ? true : ticket.team === team))
+      .filter((ticket) => (agent === "all" ? true : ticket.agent === agent))
       .sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-  }, [tickets, siteId, status, priority, department]);
+  }, [tickets, siteId, status, priority, department, team, agent]);
 
   const visible = filtered.slice(0, visibleCount);
 
@@ -128,6 +140,38 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
           ))}
         </select>
 
+        <select
+          value={team}
+          onChange={(event) => {
+            setTeam(event.target.value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          className={selectClasses}
+        >
+          <option value="all">Todos los equipos</option>
+          {teams.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={agent}
+          onChange={(event) => {
+            setAgent(event.target.value);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          className={selectClasses}
+        >
+          <option value="all">Todos los agentes</option>
+          {agents.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+
         <span className="mono-label ml-auto text-[10px] text-[color:var(--muted)]">
           {filtered.length} ticket{filtered.length === 1 ? "" : "s"}
         </span>
@@ -146,6 +190,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
               <th className="min-w-[110px] px-3 py-2 font-medium">Estado</th>
               <th className="min-w-[110px] px-3 py-2 font-medium">Prioridad</th>
               <th className="px-3 py-2 font-medium">SLA</th>
+              <th className="px-3 py-2 font-medium">Agente</th>
               <th className="px-3 py-2 font-medium">Solicitante</th>
               <th className="px-3 py-2 font-medium">Creado</th>
             </tr>
@@ -215,6 +260,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
                 <td className="px-3 py-2">
                   <SlaBar percentage={computeSlaPercentage(ticket)} />
                 </td>
+                <td className="max-w-[160px] truncate px-3 py-2 text-[color:var(--muted)]">{ticket.agent}</td>
                 <td className="px-3 py-2 text-[color:var(--muted)]">{ticket.requester}</td>
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[color:var(--muted)]">
                   {formatDateTime(ticket.createdAt)}
@@ -224,7 +270,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={12}
                   className="px-3 py-8 text-center text-[color:var(--muted)]"
                 >
                   No hay tickets que coincidan con los filtros.

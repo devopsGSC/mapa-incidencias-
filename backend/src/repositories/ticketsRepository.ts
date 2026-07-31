@@ -162,6 +162,7 @@ interface TicketRow {
   aduanaRaw: string | null;
   departmentName: string | null;
   teamName: string | null;
+  agentName: string | null;
   requesterName: string | null;
 }
 
@@ -230,6 +231,7 @@ function mapRow(row: TicketRow, ctx: MapRowContext): Ticket | null {
   const department = DEPARTMENT_NAME_FIXES[departmentRaw] ?? (departmentRaw || "Sin departamento");
   const helpTopic = (row.topicId ? ctx.helpTopicNameById.get(row.topicId) : undefined) ?? "Sin tema";
   const team = row.teamName?.trim() || "Sin equipo";
+  const agent = row.agentName?.trim() || "Sin asignar";
 
   return {
     id: `TCK-${row.ticketId}`,
@@ -239,6 +241,7 @@ function mapRow(row: TicketRow, ctx: MapRowContext): Ticket | null {
     department,
     helpTopic,
     team,
+    agent,
     siteId: resolveSiteId(row, ctx),
     createdAt: mysqlDatetimeToIso(row.created),
     updatedAt: mysqlDatetimeToIso(row.lastupdate ?? row.created),
@@ -271,11 +274,15 @@ const TICKETS_SELECT = `
     cd.aduana    AS aduanaRaw,
     d.name       AS departmentName,
     tm.name      AS teamName,
+    -- NULLIF(TRIM(...), ''): un agente sin nombre cargado (raro, pero pasa
+    -- con cuentas de staff viejas) no debe mostrarse como " " en blanco.
+    NULLIF(TRIM(CONCAT(COALESCE(st.firstname, ''), ' ', COALESCE(st.lastname, ''))), '') AS agentName,
     u.name       AS requesterName
   FROM ost_ticket t
   LEFT JOIN ost_ticket__cdata cd ON cd.ticket_id = t.ticket_id
   LEFT JOIN ost_department d ON d.id = t.dept_id
   LEFT JOIN ost_team tm ON tm.team_id = t.team_id
+  LEFT JOIN ost_staff st ON st.staff_id = t.staff_id
   LEFT JOIN ost_user u ON u.id = t.user_id
   WHERE 1=1
 `;

@@ -33,6 +33,8 @@ export interface Ticket {
   helpTopic: string;
   /** Equipo asignado (ost_team) — cruza departamentos, no es un hijo de department. "Sin equipo" si no tiene. */
   team: string;
+  /** Agente asignado (ost_staff), nombre completo. "Sin asignar" si el ticket todavía no tiene uno (staff_id=0). */
+  agent: string;
   siteId: string;
   createdAt: string;
   updatedAt: string;
