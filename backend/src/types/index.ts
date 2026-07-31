@@ -30,6 +30,8 @@ export interface Ticket {
   siteId: string;
   createdAt: string;
   updatedAt: string;
+  /** Vencimiento efectivo de SLA (duedate si está seteado a mano, si no est_duedate calculado por osTicket según el SLA asignado). null si el ticket no tiene ninguno de los dos. */
+  slaDueAt: string | null;
   requester: string;
   /** Link al detalle del ticket en el panel real de osTicket. Ausente si OSTICKET_BASE_URL no está configurada. */
   osTicketUrl?: string;

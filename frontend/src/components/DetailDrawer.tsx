@@ -1,5 +1,6 @@
 import { IconExternalLink } from "@tabler/icons-react";
 import { PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { SlaRing } from "./SlaRing";
 import { DepartmentIcon } from "../lib/departmentIcons";
 import {
   PRIORITY_BADGE_CLASSES,
@@ -7,6 +8,7 @@ import {
   SITE_TYPE_LABELS,
   STATUS_LABELS,
 } from "../lib/labels";
+import { computeSlaPercentage } from "../lib/sla";
 import { Site, Ticket, TicketStatus } from "../types";
 
 interface DetailDrawerProps {
@@ -173,20 +175,25 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
                   ticket.priority === "urgente" ? "var(--red)" : "var(--blue)",
               }}
             >
-              {ticket.osTicketUrl ? (
-                <a
-                  href={ticket.osTicketUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="line-clamp-2 inline-flex items-start gap-1 text-xs text-[color:var(--text)] hover:text-[color:var(--cyan)] hover:underline"
-                  title="Ver ticket en osTicket"
-                >
-                  {ticket.subject}
-                  <IconExternalLink size={11} stroke={2} className="mt-0.5 flex-shrink-0" />
-                </a>
-              ) : (
-                <p className="line-clamp-2 text-xs text-[color:var(--text)]">{ticket.subject}</p>
-              )}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  {ticket.osTicketUrl ? (
+                    <a
+                      href={ticket.osTicketUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="line-clamp-2 inline-flex items-start gap-1 text-xs text-[color:var(--text)] hover:text-[color:var(--cyan)] hover:underline"
+                      title="Ver ticket en osTicket"
+                    >
+                      {ticket.subject}
+                      <IconExternalLink size={11} stroke={2} className="mt-0.5 flex-shrink-0" />
+                    </a>
+                  ) : (
+                    <p className="line-clamp-2 text-xs text-[color:var(--text)]">{ticket.subject}</p>
+                  )}
+                </div>
+                <SlaRing percentage={computeSlaPercentage(ticket)} />
+              </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span
                   className={`mono-label rounded px-1.5 py-0.5 text-[9px] font-semibold ${PRIORITY_BADGE_CLASSES[ticket.priority]}`}

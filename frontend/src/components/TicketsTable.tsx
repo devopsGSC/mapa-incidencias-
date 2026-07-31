@@ -1,5 +1,6 @@
 import { IconExternalLink } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
+import { SlaBar } from "./SlaBar";
 import { DepartmentIcon } from "../lib/departmentIcons";
 import {
   formatDateTime,
@@ -8,6 +9,7 @@ import {
   STATUS_DOT_COLORS,
   STATUS_LABELS,
 } from "../lib/labels";
+import { computeSlaPercentage } from "../lib/sla";
 import { Site, Ticket, TicketPriority, TicketStatus } from "../types";
 
 interface TicketsTableProps {
@@ -143,6 +145,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
               <th className="px-3 py-2 font-medium">Equipo</th>
               <th className="min-w-[110px] px-3 py-2 font-medium">Estado</th>
               <th className="min-w-[110px] px-3 py-2 font-medium">Prioridad</th>
+              <th className="px-3 py-2 font-medium">SLA</th>
               <th className="px-3 py-2 font-medium">Solicitante</th>
               <th className="px-3 py-2 font-medium">Creado</th>
             </tr>
@@ -209,6 +212,9 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
                     </span>
                   </span>
                 </td>
+                <td className="px-3 py-2">
+                  <SlaBar percentage={computeSlaPercentage(ticket)} />
+                </td>
                 <td className="px-3 py-2 text-[color:var(--muted)]">{ticket.requester}</td>
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[color:var(--muted)]">
                   {formatDateTime(ticket.createdAt)}
@@ -218,7 +224,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
             {visible.length === 0 && (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={11}
                   className="px-3 py-8 text-center text-[color:var(--muted)]"
                 >
                   No hay tickets que coincidan con los filtros.

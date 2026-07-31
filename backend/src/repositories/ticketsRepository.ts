@@ -156,6 +156,7 @@ interface TicketRow {
   topicId: number | null;
   created: string; // raw MySQL "YYYY-MM-DD HH:MM:SS" (ver dateStrings en db.ts)
   lastupdate: string | null;
+  slaDueRaw: string | null;
   subject: string | null;
   priorityRaw: string | null;
   aduanaRaw: string | null;
@@ -241,6 +242,7 @@ function mapRow(row: TicketRow, ctx: MapRowContext): Ticket | null {
     siteId: resolveSiteId(row, ctx),
     createdAt: mysqlDatetimeToIso(row.created),
     updatedAt: mysqlDatetimeToIso(row.lastupdate ?? row.created),
+    slaDueAt: row.slaDueRaw ? mysqlDatetimeToIso(row.slaDueRaw) : null,
     requester: row.requesterName?.trim() || "Desconocido",
     osTicketUrl: OSTICKET_BASE_URL
       ? `${OSTICKET_BASE_URL}/scp/tickets.php?id=${row.ticketId}`
@@ -259,6 +261,11 @@ const TICKETS_SELECT = `
     t.topic_id   AS topicId,
     t.created    AS created,
     t.lastupdate AS lastupdate,
+    -- duedate: fecha de vencimiento fijada a mano, casi siempre null. Si no
+    -- está, cae a est_duedate (la que osTicket calcula sola a partir del
+    -- SLA asignado) — mismo criterio que usa el propio osTicket para decidir
+    -- si un ticket está vencido.
+    COALESCE(t.duedate, t.est_duedate) AS slaDueRaw,
     cd.subject   AS subject,
     cd.priority  AS priorityRaw,
     cd.aduana    AS aduanaRaw,

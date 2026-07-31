@@ -144,6 +144,26 @@ body {
   }
 }
 
+/* Punto que titila sobre el anillo de SLA cuando está por vencer (>75%) —
+   mismo espíritu que .urgente-alarm (llamar la atención de reojo), pero
+   como un punto propio en vez de un glow del borde, porque acá conviven
+   varias tarjetas de ticket a la vez y cada una necesita su propia señal. */
+.sla-blink {
+  animation: sla-blink 1.1s ease-in-out infinite;
+}
+
+@keyframes sla-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(0.6);
+  }
+}
+
 .leaflet-container {
   background: var(--map-bg);
 }
