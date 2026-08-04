@@ -39,7 +39,10 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
 
   // En vivo a partir de los tickets ya cargados (mismo criterio del proyecto:
   // nunca hardcodear estas listas) — así solo aparecen opciones que el
-  // usuario autenticado realmente puede ver.
+  // usuario autenticado realmente puede ver. Departamento -> equipo -> agente
+  // es una cascada real de los DATOS (no un árbol fijo: un mismo equipo puede
+  // tener tickets de varios departamentos), cada nivel se recorta según lo
+  // que ya esté elegido en el nivel anterior.
   const departments = useMemo(() => {
     return Array.from(new Set(tickets.map((ticket) => ticket.department))).sort((a, b) =>
       a.localeCompare(b)
@@ -47,12 +50,16 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
   }, [tickets]);
 
   const teams = useMemo(() => {
-    return Array.from(new Set(tickets.map((ticket) => ticket.team))).sort((a, b) => a.localeCompare(b));
-  }, [tickets]);
+    const scoped = department === "all" ? tickets : tickets.filter((t) => t.department === department);
+    return Array.from(new Set(scoped.map((t) => t.team))).sort((a, b) => a.localeCompare(b));
+  }, [tickets, department]);
 
   const agents = useMemo(() => {
-    return Array.from(new Set(tickets.map((ticket) => ticket.agent))).sort((a, b) => a.localeCompare(b));
-  }, [tickets]);
+    const scoped = tickets
+      .filter((t) => department === "all" || t.department === department)
+      .filter((t) => team === "all" || t.team === team);
+    return Array.from(new Set(scoped.map((t) => t.agent))).sort((a, b) => a.localeCompare(b));
+  }, [tickets, department, team]);
 
   const filtered = useMemo(() => {
     return tickets
@@ -128,6 +135,11 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
           value={department}
           onChange={(event) => {
             setDepartment(event.target.value);
+            // Cambiar el departamento resetea equipo y agente: ambos son
+            // subconjuntos del departamento elegido, mantener una selección
+            // vieja podría dejar filtros "fantasma" que ya no aplican a nada.
+            setTeam("all");
+            setAgent("all");
             setVisibleCount(PAGE_SIZE);
           }}
           className={selectClasses}
@@ -144,6 +156,7 @@ export function TicketsTable({ tickets, sites }: TicketsTableProps) {
           value={team}
           onChange={(event) => {
             setTeam(event.target.value);
+            setAgent("all");
             setVisibleCount(PAGE_SIZE);
           }}
           className={selectClasses}

@@ -169,30 +169,36 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
           siteTickets.map((ticket) => (
             <div
               key={ticket.id}
-              className="rounded-r-lg border border-[color:var(--glass-border)] border-l-[3px] bg-white/[0.03] px-3 py-2.5"
+              className="relative rounded-r-lg border border-[color:var(--glass-border)] border-l-[3px] bg-white/[0.03] px-3 py-2.5"
               style={{
                 borderLeftColor:
                   ticket.priority === "urgente" ? "var(--red)" : "var(--blue)",
               }}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  {ticket.osTicketUrl ? (
-                    <a
-                      href={ticket.osTicketUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="line-clamp-2 inline-flex items-start gap-1 text-xs text-[color:var(--text)] hover:text-[color:var(--cyan)] hover:underline"
-                      title="Ver ticket en osTicket"
-                    >
-                      {ticket.subject}
-                      <IconExternalLink size={11} stroke={2} className="mt-0.5 flex-shrink-0" />
-                    </a>
-                  ) : (
-                    <p className="line-clamp-2 text-xs text-[color:var(--text)]">{ticket.subject}</p>
-                  )}
-                </div>
+              {/* Absoluto a propósito: el anillo (42px + etiqueta "SLA") es
+                  más alto que una sola línea de asunto — si compartiera fila
+                  flex con el texto, la altura de la fila quedaba fijada por
+                  el anillo y el resto de la tarjeta (prioridad, tema, equipo)
+                  se corría más abajo de lo necesario cuando el asunto era
+                  corto. Así queda desacoplado del flujo normal. */}
+              <div className="absolute right-2 top-2">
                 <SlaRing percentage={computeSlaPercentage(ticket)} />
+              </div>
+              <div className="min-w-0 pr-11">
+                {ticket.osTicketUrl ? (
+                  <a
+                    href={ticket.osTicketUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="line-clamp-2 inline-flex items-start gap-1 text-xs text-[color:var(--text)] hover:text-[color:var(--cyan)] hover:underline"
+                    title="Ver ticket en osTicket"
+                  >
+                    {ticket.subject}
+                    <IconExternalLink size={11} stroke={2} className="mt-0.5 flex-shrink-0" />
+                  </a>
+                ) : (
+                  <p className="line-clamp-2 text-xs text-[color:var(--text)]">{ticket.subject}</p>
+                )}
               </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span
