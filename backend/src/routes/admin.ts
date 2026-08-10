@@ -307,6 +307,26 @@ adminRouter.patch("/users/:username/profile", async (req, res, next) => {
   }
 });
 
+adminRouter.patch("/users/:username/password", async (req, res, next) => {
+  try {
+    const { password } = (req.body ?? {}) as { password?: unknown };
+    if (typeof password !== "string" || password.length < 8) {
+      res.status(400).json({ error: "password debe tener al menos 8 caracteres." });
+      return;
+    }
+
+    const username = decodeURIComponent(req.params.username);
+    const updated = await usersRepository.setPassword(username, password);
+    if (!updated) {
+      res.status(404).json({ error: "Usuario no encontrado." });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminRouter.delete("/users/:username", (req, res) => {
   const username = decodeURIComponent(req.params.username);
 

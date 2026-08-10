@@ -101,6 +101,8 @@ export interface UsersRepository {
   ): UpdateProfileResult;
   setResetToken(username: string, token: string, expiresAt: number): void;
   resetPasswordWithToken(token: string, newPassword: string): Promise<ResetPasswordWithTokenResult>;
+  /** Fijado directo por un admin (panel), sin pasar por el flujo de token de email. Devuelve false si el usuario no existe. */
+  setPassword(username: string, newPassword: string): Promise<boolean>;
   remove(username: string): boolean;
   countAdmins(): number;
   /** null = sin restricción (ve todos los departamentos). Siempre lee el JSON en memoria más reciente, nunca un valor cacheado en el JWT — así un cambio de permisos por el admin aplica de inmediato, sin esperar a que expire la sesión. */
@@ -214,6 +216,19 @@ class JsonUsersRepository implements UsersRepository {
     user.resetTokenExpiry = null;
     writeUsersFile(this.users);
     return "ok";
+  }
+
+  async setPassword(username: string, newPassword: string): Promise<boolean> {
+    const user = this.findByUsername(username);
+    if (!user) return false;
+    user.passwordHash = await bcrypt.hash(newPassword, PASSWORD_HASH_COST);
+    // Un cambio de contraseña por el admin invalida cualquier token de
+    // recuperación pendiente por email — evita que un link viejo conviva
+    // con la contraseña nueva.
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    writeUsersFile(this.users);
+    return true;
   }
 
   remove(username: string): boolean {

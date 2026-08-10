@@ -73,6 +73,13 @@ export function updateUserProfile(
   });
 }
 
+export function setUserPassword(username: string, password: string): Promise<{ ok: true }> {
+  return adminRequest(`/users/${encodeURIComponent(username)}/password`, {
+    method: "PATCH",
+    body: JSON.stringify({ password }),
+  });
+}
+
 export function deleteUser(username: string): Promise<{ ok: true }> {
   return adminRequest(`/users/${encodeURIComponent(username)}`, { method: "DELETE" });
 }

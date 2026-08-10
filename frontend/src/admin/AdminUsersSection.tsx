@@ -1,10 +1,11 @@
-import { IconEdit, IconTrash, IconUserPlus } from "@tabler/icons-react";
+import { IconEdit, IconKey, IconTrash, IconUserPlus } from "@tabler/icons-react";
 import { FormEvent, useEffect, useState } from "react";
 import {
   createUser,
   deleteUser,
   fetchDepartments,
   fetchUsers,
+  setUserPassword,
   setUserRole,
   updateUserProfile,
 } from "../api/adminClient";
@@ -32,6 +33,11 @@ interface EditFormState {
   username: string;
   email: string;
   allowedDepartments: string[];
+}
+
+interface PasswordFormState {
+  username: string;
+  password: string;
 }
 
 interface DepartmentsCheckboxGroupProps {
@@ -79,6 +85,9 @@ export function AdminUsersSection() {
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [passwordForm, setPasswordForm] = useState<PasswordFormState | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   const load = async () => {
     try {
@@ -177,6 +186,35 @@ export function AdminUsersSection() {
       setEditError(err instanceof Error ? err.message : "No se pudo guardar los cambios.");
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const openPasswordForm = (u: AdminUserSummary) => {
+    setPasswordError(null);
+    setPasswordForm({ username: u.username, password: "" });
+  };
+
+  const handlePasswordSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!passwordForm) return;
+    if (passwordForm.password.length < 8) {
+      setPasswordError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    setPasswordError(null);
+    try {
+      await setUserPassword(passwordForm.username, passwordForm.password);
+      setPasswordForm(null);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        clearSession();
+        return;
+      }
+      setPasswordError(err instanceof Error ? err.message : "No se pudo cambiar la contraseña.");
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -296,6 +334,15 @@ export function AdminUsersSection() {
                         className="mr-2 rounded p-1 text-[color:var(--text-secondary)] transition-colors hover:text-[color:var(--text)]"
                       >
                         <IconEdit size={15} stroke={2} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openPasswordForm(u)}
+                        aria-label={`Cambiar contraseña de ${u.username}`}
+                        title="Cambiar contraseña"
+                        className="mr-2 rounded p-1 text-[color:var(--text-secondary)] transition-colors hover:text-[color:var(--text)]"
+                      >
+                        <IconKey size={15} stroke={2} />
                       </button>
                       <button
                         type="button"
@@ -460,6 +507,47 @@ export function AdminUsersSection() {
                 className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-[color:var(--text)] hover:bg-white/15 disabled:opacity-50"
               >
                 {editSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {passwordForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <form onSubmit={handlePasswordSubmit} className="glass-panel w-full max-w-sm space-y-4 p-6">
+            <h3 className="font-display text-base font-semibold text-[color:var(--text)]">
+              Cambiar contraseña de {passwordForm.username}
+            </h3>
+
+            <label className="block text-sm text-[color:var(--text-secondary)]">
+              Contraseña nueva
+              <PasswordInput
+                value={passwordForm.password}
+                onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+                required
+                autoFocus
+                minLength={8}
+                className="rounded-md border border-[color:var(--glass-border)] bg-black/20 px-3 py-2 text-[color:var(--text)] outline-none focus:border-[color:var(--cyan)]"
+              />
+            </label>
+
+            {passwordError && <p className="text-sm text-[#FF718A]">{passwordError}</p>}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPasswordForm(null)}
+                className="rounded-md bg-white/5 px-3 py-1.5 text-sm text-[color:var(--text)] hover:bg-white/10"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={passwordSaving}
+                className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-[color:var(--text)] hover:bg-white/15 disabled:opacity-50"
+              >
+                {passwordSaving ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </form>
