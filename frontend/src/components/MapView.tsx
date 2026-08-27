@@ -14,6 +14,11 @@ interface MapViewProps {
 
 const EL_SALVADOR_CENTER: [number, number] = [13.79, -88.92];
 
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY;
+const CARTO_TILE_URL = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${
+  CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ""
+}`;
+
 const EMPTY_PRESENCE: PriorityPresence = {
   low: false,
   normal: false,
@@ -39,7 +44,7 @@ export function MapView({
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url={CARTO_TILE_URL}
       />
       <CountryBoundary />
       {sites.map((site) => {
