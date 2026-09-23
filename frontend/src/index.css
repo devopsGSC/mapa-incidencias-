@@ -164,6 +164,12 @@ body {
   }
 }
 
+/* Ver src/lib/hudScale.ts. Posiciones (top/right/bottom) y tamaños del panel
+   escalan juntos, así el layout relativo entre paneles se mantiene. */
+.hud-scale {
+  zoom: var(--hud-zoom, 1);
+}
+
 .leaflet-container {
   background: var(--map-bg);
 }

@@ -103,7 +103,7 @@ export function DetailDrawer({ site, tickets, onClose }: DetailDrawerProps) {
 
   return (
     <div
-      className="glass-panel fixed bottom-5 left-5 right-[320px] z-[15] flex flex-col overflow-hidden px-5 pb-4 pt-1"
+      className="hud-scale glass-panel fixed bottom-5 left-5 right-[320px] z-[15] flex flex-col overflow-hidden px-5 pb-4 pt-1"
       style={{
         maxHeight: `${liveHeight}px`,
         transition: dragging ? "none" : "max-height 200ms ease-out",

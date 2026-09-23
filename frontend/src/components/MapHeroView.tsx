@@ -118,7 +118,7 @@ export function MapHeroView({ sites, tickets, selectedSite, onSelectSite }: MapH
 
 function MapLegend() {
   return (
-    <div className="glass-panel fixed bottom-5 left-5 z-10 px-3.5 py-3 text-xs text-[color:var(--muted)]">
+    <div className="hud-scale glass-panel fixed bottom-5 left-5 z-10 px-3.5 py-3 text-xs text-[color:var(--muted)]">
       <LegendRow color="var(--fill-danger)" label="Urgente" />
       <LegendRow color="var(--fill-warning)" label="Alta" />
       <LegendRow color="var(--fill-accent)" label="Normal" />

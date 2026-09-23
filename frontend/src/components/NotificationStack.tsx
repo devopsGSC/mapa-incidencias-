@@ -31,7 +31,7 @@ export function NotificationStack({ notifications, sites, onDismiss }: Notificat
   if (notifications.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed right-[320px] top-[90px] z-[25] flex w-full max-w-xl flex-col gap-3 px-4">
+    <div className="hud-scale pointer-events-none fixed right-[320px] top-[90px] z-[25] flex w-full max-w-xl flex-col gap-3 px-4">
       {notifications.map((notification) => (
         <Toast
           key={notification.id}

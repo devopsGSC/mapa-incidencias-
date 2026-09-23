@@ -1,5 +1,7 @@
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
 import { CountryBoundary } from "./CountryBoundary";
+import { MapZoomControls } from "./MapZoomControls";
+import { countryFitOptions, EL_SALVADOR_BOUNDS } from "../lib/mapFraming";
 import { buildSiteMarkerIcon } from "../lib/siteMarkerIcon";
 import { DepartmentCount, PriorityPresence } from "../lib/siteDominance";
 import { Site } from "../types";
@@ -11,8 +13,6 @@ interface MapViewProps {
   selectedSiteId?: string;
   onSelectSite: (site: Site) => void;
 }
-
-const EL_SALVADOR_CENTER: [number, number] = [13.79, -88.92];
 
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY;
 const CARTO_TILE_URL = `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${
@@ -35,8 +35,9 @@ export function MapView({
 }: MapViewProps) {
   return (
     <MapContainer
-      center={EL_SALVADOR_CENTER}
-      zoom={9}
+      bounds={EL_SALVADOR_BOUNDS}
+      boundsOptions={countryFitOptions()}
+      zoomSnap={0.25}
       minZoom={8}
       zoomControl={false}
       scrollWheelZoom
@@ -47,6 +48,9 @@ export function MapView({
         url={CARTO_TILE_URL}
       />
       <CountryBoundary />
+      {/* zoomControl nativo desactivado por estética; estos botones grandes
+          son necesarios en navegadores de TV, que no tienen rueda ni pinch. */}
+      <MapZoomControls homeBounds={EL_SALVADOR_BOUNDS} />
       {sites.map((site) => {
         const departmentCounts = departmentBreakdownBySite.get(site.id) ?? [];
         const priorityPresence = sitePriorityPresenceById.get(site.id) ?? EMPTY_PRESENCE;

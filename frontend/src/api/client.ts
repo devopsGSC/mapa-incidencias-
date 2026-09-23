@@ -1,6 +1,7 @@
 import { Site, Ticket, TicketFilters, TicketStats } from "../types";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+// En dev, mismo origen: el proxy de vite.config.ts reenvía /api y /socket.io al backend.
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "" : "http://localhost:4000");
 
 export class UnauthorizedError extends Error {}
 

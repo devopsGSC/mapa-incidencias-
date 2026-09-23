@@ -26,7 +26,7 @@ export function SiteRail({ sites, siteStatsById, selectedSiteId, onSelectSite }:
   }, [sites, siteStatsById]);
 
   return (
-    <div className="glass-panel fixed bottom-5 right-5 top-[78px] z-10 flex w-[280px] flex-col overflow-hidden">
+    <div className="hud-scale glass-panel fixed bottom-5 right-5 top-[78px] z-10 flex w-[280px] flex-col overflow-hidden">
       <h3 className="mono-label border-b border-[color:var(--glass-border)] px-4 py-3.5 text-[11px] text-[color:var(--muted)]">
         Sitios
       </h3>

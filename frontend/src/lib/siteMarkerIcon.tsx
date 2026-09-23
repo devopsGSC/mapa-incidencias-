@@ -138,7 +138,7 @@ export function buildSiteMarkerIcon(
   // "containing block" de referencia para los secundarios — el aro donut
   // (conic-gradient + círculo interior) es puramente visual y no cambia
   // esa geometría en absoluto.
-  const html = `<div data-site-marker="${siteId ?? ""}" data-secondary-count="${iconsToShow.length}" style="position:relative;width:${WRAPPER_SIZE}px;height:${WRAPPER_SIZE}px;">
+  const html = `<div data-site-marker="${siteId ?? ""}" data-secondary-count="${iconsToShow.length}" style="position:relative;width:${WRAPPER_SIZE}px;height:${WRAPPER_SIZE}px;transform:scale(var(--hud-zoom,1));transform-origin:${MAIN_CENTER}px ${MAIN_CENTER}px;">
       <div class="${pulseClass}" style="
         position:absolute;left:${MAIN_OFFSET}px;top:${MAIN_OFFSET}px;z-index:5;
         width:${MAIN_SIZE}px;height:${MAIN_SIZE}px;border-radius:9999px;

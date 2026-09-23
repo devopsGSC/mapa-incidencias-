@@ -43,7 +43,7 @@ export default function App() {
       />
 
       {error && (
-        <div className="fixed left-1/2 top-[78px] z-40 -translate-x-1/2 rounded-lg border border-[#FF4D6D]/40 bg-[#2a0f16]/90 px-4 py-2 text-sm text-[#ff8fa3]">
+        <div className="hud-scale fixed left-1/2 top-[78px] z-40 -translate-x-1/2 rounded-lg border border-[#FF4D6D]/40 bg-[#2a0f16]/90 px-4 py-2 text-sm text-[#ff8fa3]">
           Error cargando datos del backend: {error}. Verifica que la API esté
           corriendo en el puerto 4000.
         </div>

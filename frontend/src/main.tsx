@@ -9,6 +9,9 @@ import { RequireRole } from "./auth/RequireRole";
 import { ResetPasswordPage } from "./auth/ResetPasswordPage";
 import App from "./App";
 import "./index.css";
+import { initHudScale } from "./lib/hudScale";
+
+initHudScale();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

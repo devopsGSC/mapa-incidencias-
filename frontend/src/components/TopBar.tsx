@@ -26,7 +26,7 @@ export function TopBar({
   onLogout,
 }: TopBarProps) {
   return (
-    <header className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-[#080c16] to-transparent px-5 py-4">
+    <header className="hud-scale fixed left-0 right-0 top-0 z-30 flex items-center justify-between gap-4 bg-gradient-to-b from-[#080c16] to-transparent px-5 py-4">
       <div className="flex items-center gap-3">
         <img src={logo} alt="Global Customs Solutions" className="h-9 w-auto" />
         <div>
